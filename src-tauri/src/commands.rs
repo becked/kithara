@@ -1,5 +1,7 @@
-use crate::models::{Category, ExtractionStatus, Sound, UnitType};
+use crate::models::{Category, ExtractionStatus, PlaybackStatus, Sound, UnitType};
+use crate::player::PlayerState;
 use std::path::PathBuf;
+use tauri::State;
 
 /// Search for sounds matching the query and filters
 #[tauri::command]
@@ -52,19 +54,38 @@ pub async fn get_unit_types() -> Result<Vec<UnitType>, String> {
     Ok(vec![])
 }
 
-/// Play a sound by its ID
+/// Play a sound by its ID and file path
 #[tauri::command]
-pub async fn play_sound(id: String) -> Result<(), String> {
-    // TODO: Implement audio playback with rodio
-    println!("Playing sound: {}", id);
-    Ok(())
+pub async fn play_sound(
+    id: String,
+    file_path: String,
+    player: State<'_, PlayerState>,
+) -> Result<(), String> {
+    let path = PathBuf::from(&file_path);
+
+    // Validate file exists
+    if !path.exists() {
+        return Err(format!("Audio file not found: {}", file_path));
+    }
+
+    player.play(id, path)
 }
 
 /// Stop the currently playing sound
 #[tauri::command]
-pub async fn stop_sound() -> Result<(), String> {
-    // TODO: Implement stop playback
-    Ok(())
+pub async fn stop_sound(player: State<'_, PlayerState>) -> Result<(), String> {
+    player.stop()
+}
+
+/// Get the current playback status
+#[tauri::command]
+pub async fn get_playback_status(player: State<'_, PlayerState>) -> Result<PlaybackStatus, String> {
+    let status = player.get_status()?;
+
+    Ok(PlaybackStatus {
+        is_playing: status.is_playing,
+        current_sound_id: status.current_sound_id,
+    })
 }
 
 /// Get the current extraction status

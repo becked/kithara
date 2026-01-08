@@ -1,91 +1,98 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import SoundGrid from '$lib/components/SoundGrid.svelte';
+	import NowPlaying from '$lib/components/NowPlaying.svelte';
+	import { soundsState, loadTestSounds } from '$lib/stores/sounds.svelte';
 
-	let status = $state('Initializing...');
 	let tauriAvailable = $state(false);
 
 	onMount(async () => {
 		// Check if we're running in Tauri
 		if ('__TAURI__' in window) {
 			tauriAvailable = true;
-			status = 'Tauri backend connected';
-		} else {
-			status = 'Running in browser (Tauri not available)';
+			await loadTestSounds();
 		}
 	});
 </script>
 
 <main>
-	<div class="hero">
+	<header>
 		<h1>Kithara</h1>
 		<p class="subtitle">Old World Soundboard</p>
-	</div>
+	</header>
 
-	<div class="status">
-		<div class="status-indicator" class:connected={tauriAvailable}></div>
-		<span>{status}</span>
-	</div>
+	{#if soundsState.loading}
+		<div class="loading">Loading sounds...</div>
+	{:else if soundsState.error}
+		<div class="error">{soundsState.error}</div>
+	{:else if !tauriAvailable}
+		<div class="warning">
+			<p>Running in browser mode</p>
+			<p class="hint">Run with <code>npm run tauri dev</code> for full functionality</p>
+		</div>
+	{:else}
+		<SoundGrid sounds={soundsState.sounds} />
+	{/if}
 
-	<div class="placeholder">
-		<p>Sound grid will appear here once extraction is complete.</p>
-	</div>
+	<NowPlaying />
 </main>
 
 <style>
 	main {
+		height: 100vh;
+		display: flex;
+		flex-direction: column;
+		padding-bottom: 60px; /* Space for NowPlaying bar */
+	}
+
+	header {
+		padding: 1rem 1.5rem;
+		border-bottom: 1px solid var(--color-border);
+		flex-shrink: 0;
+	}
+
+	h1 {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: var(--color-primary);
+		margin-bottom: 0.25rem;
+	}
+
+	.subtitle {
+		font-size: 0.9rem;
+		color: var(--color-text-muted);
+	}
+
+	.loading,
+	.error,
+	.warning {
+		padding: 2rem;
+		text-align: center;
 		flex: 1;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		padding: 2rem;
-		gap: 2rem;
-	}
-
-	.hero {
-		text-align: center;
-	}
-
-	h1 {
-		font-size: 3rem;
-		font-weight: 700;
-		color: var(--color-primary);
-		margin-bottom: 0.5rem;
-	}
-
-	.subtitle {
-		font-size: 1.2rem;
-		color: var(--color-text-muted);
-	}
-
-	.status {
-		display: flex;
-		align-items: center;
 		gap: 0.5rem;
-		padding: 0.75rem 1.5rem;
-		background: var(--color-bg-secondary);
-		border-radius: var(--radius-md);
-		border: 1px solid var(--color-border);
 	}
 
-	.status-indicator {
-		width: 10px;
-		height: 10px;
-		border-radius: 50%;
-		background: var(--color-text-muted);
+	.error {
+		color: var(--color-primary);
 	}
 
-	.status-indicator.connected {
-		background: #4ade80;
-	}
-
-	.placeholder {
-		padding: 3rem;
-		background: var(--color-bg-secondary);
-		border-radius: var(--radius-lg);
-		border: 2px dashed var(--color-border);
+	.warning {
 		color: var(--color-text-muted);
-		text-align: center;
-		max-width: 400px;
+	}
+
+	.warning .hint {
+		font-size: 0.85rem;
+		opacity: 0.7;
+	}
+
+	.warning code {
+		background: var(--color-bg-secondary);
+		padding: 0.2rem 0.5rem;
+		border-radius: var(--radius-sm);
+		font-family: monospace;
 	}
 </style>

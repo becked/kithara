@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { Sound, Category, UnitType, ExtractionStatus } from './types';
+import type { Sound, Category, UnitType, ExtractionStatus, PlaybackStatus } from './types';
 
 // Re-export types for convenience
-export type { Sound, Category, UnitType, ExtractionStatus };
+export type { Sound, Category, UnitType, ExtractionStatus, PlaybackStatus };
 export type { ExtractionState } from './types';
 
 export async function searchSounds(
@@ -21,12 +21,16 @@ export async function getUnitTypes(): Promise<UnitType[]> {
 	return invoke('get_unit_types');
 }
 
-export async function playSound(id: string): Promise<void> {
-	return invoke('play_sound', { id });
+export async function playSound(id: string, filePath: string): Promise<void> {
+	return invoke('play_sound', { id, filePath });
 }
 
 export async function stopSound(): Promise<void> {
 	return invoke('stop_sound');
+}
+
+export async function getPlaybackStatus(): Promise<PlaybackStatus> {
+	return invoke('get_playback_status');
 }
 
 export async function getExtractionStatus(): Promise<ExtractionStatus> {

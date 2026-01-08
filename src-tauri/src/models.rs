@@ -70,6 +70,15 @@ impl Default for ExtractionStatus {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/lib/types/"))]
+#[serde(rename_all = "camelCase")]
+pub struct PlaybackStatus {
+    pub is_playing: bool,
+    pub current_sound_id: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +90,6 @@ mod tests {
         UnitType::export_all().expect("Failed to export UnitType");
         ExtractionState::export_all().expect("Failed to export ExtractionState");
         ExtractionStatus::export_all().expect("Failed to export ExtractionStatus");
+        PlaybackStatus::export_all().expect("Failed to export PlaybackStatus");
     }
 }

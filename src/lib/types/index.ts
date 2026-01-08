@@ -4,5 +4,6 @@
 export type { Category } from './Category';
 export type { ExtractionState } from './ExtractionState';
 export type { ExtractionStatus } from './ExtractionStatus';
+export type { PlaybackStatus } from './PlaybackStatus';
 export type { Sound } from './Sound';
 export type { UnitType } from './UnitType';
