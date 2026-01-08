@@ -1,8 +1,10 @@
 use crate::catalog::Catalog;
-use crate::models::{Category, ExtractionStatus, PlaybackStatus, Sound, UnitType};
+use crate::extractor::{self, ExtractionManager};
+use crate::models::{Category, ExtractionState, ExtractionStatus, PlaybackStatus, Sound, UnitType};
 use crate::player::PlayerState;
 use std::path::PathBuf;
-use tauri::State;
+use std::sync::Arc;
+use tauri::{AppHandle, State};
 
 /// Search for sounds matching the query and filters
 #[tauri::command]
@@ -63,15 +65,75 @@ pub async fn get_playback_status(player: State<'_, PlayerState>) -> Result<Playb
 
 /// Get the current extraction status
 #[tauri::command]
-pub async fn get_extraction_status() -> Result<ExtractionStatus, String> {
-    // TODO: Implement extraction status tracking
-    Ok(ExtractionStatus::default())
+pub async fn get_extraction_status(
+    manager: State<'_, Arc<ExtractionManager>>,
+) -> Result<ExtractionStatus, String> {
+    Ok(manager.get_status())
 }
 
 /// Start the audio extraction process
 #[tauri::command]
-pub async fn start_extraction() -> Result<(), String> {
-    // TODO: Implement extraction process
+pub async fn start_extraction(
+    app: AppHandle,
+    game_path: String,
+    manager: State<'_, Arc<ExtractionManager>>,
+    _catalog: State<'_, Catalog>,
+) -> Result<(), String> {
+    // Validate game path
+    let game_path = PathBuf::from(&game_path);
+    if !game_path.exists() {
+        return Err("Game path does not exist".into());
+    }
+
+    // Check required files
+    let required_files = ["Events.xml", "Audio_Animation.bnk"];
+    for file in required_files {
+        if !game_path.join(file).exists() {
+            return Err(format!("Required file not found: {}", file));
+        }
+    }
+
+    // Check if already in progress
+    let status = manager.get_status();
+    if matches!(status.state, ExtractionState::InProgress) {
+        return Err("Extraction already in progress".into());
+    }
+
+    // Reset state
+    manager.reset();
+
+    // Clone for async task
+    let manager_clone = Arc::clone(&*manager);
+
+    // Create a new catalog connection for the background task
+    let db_path = crate::catalog::get_db_path()?;
+    let catalog_for_task = Arc::new(
+        Catalog::open(db_path).map_err(|e| format!("Failed to open catalog: {}", e))?
+    );
+
+    // Spawn extraction task
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = extractor::run_extraction(
+            app,
+            game_path,
+            manager_clone.clone(),
+            catalog_for_task,
+        )
+        .await
+        {
+            manager_clone.set_error(e);
+        }
+    });
+
+    Ok(())
+}
+
+/// Cancel the current extraction
+#[tauri::command]
+pub async fn cancel_extraction(
+    manager: State<'_, Arc<ExtractionManager>>,
+) -> Result<(), String> {
+    manager.request_cancel();
     Ok(())
 }
 

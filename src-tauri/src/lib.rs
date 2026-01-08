@@ -1,10 +1,13 @@
 mod catalog;
 mod commands;
+mod extractor;
 mod models;
 mod player;
 
 use catalog::{get_db_path, Catalog};
+use extractor::ExtractionManager;
 use player::create_player_state;
+use std::sync::Arc;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,10 +19,14 @@ pub fn run() {
     println!("Database path: {:?}", db_path);
     let catalog = Catalog::open(db_path).expect("Failed to initialize catalog");
 
+    // Initialize extraction manager
+    let extraction_manager = Arc::new(ExtractionManager::new());
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(player_state)
         .manage(catalog)
+        .manage(extraction_manager)
         .invoke_handler(tauri::generate_handler![
             commands::search_sounds,
             commands::get_categories,
@@ -29,6 +36,7 @@ pub fn run() {
             commands::get_playback_status,
             commands::get_extraction_status,
             commands::start_extraction,
+            commands::cancel_extraction,
             commands::detect_game_path,
         ])
         .setup(|app| {

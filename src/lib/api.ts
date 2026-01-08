@@ -37,8 +37,12 @@ export async function getExtractionStatus(): Promise<ExtractionStatus> {
 	return invoke('get_extraction_status');
 }
 
-export async function startExtraction(): Promise<void> {
-	return invoke('start_extraction');
+export async function startExtraction(gamePath: string): Promise<void> {
+	return invoke('start_extraction', { gamePath });
+}
+
+export async function cancelExtraction(): Promise<void> {
+	return invoke('cancel_extraction');
 }
 
 export async function detectGamePath(): Promise<string | null> {

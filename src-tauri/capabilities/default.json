@@ -6,6 +6,13 @@
 	"permissions": [
 		"core:default",
 		"core:path:default",
-		"shell:allow-open"
+		"shell:allow-open",
+		{
+			"identifier": "shell:allow-execute",
+			"allow": [
+				{ "name": "vgmstream-cli", "sidecar": true },
+				{ "name": "ffmpeg", "sidecar": true }
+			]
+		}
 	]
 }
