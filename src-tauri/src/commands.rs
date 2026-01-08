@@ -1,3 +1,4 @@
+use crate::catalog::Catalog;
 use crate::models::{Category, ExtractionStatus, PlaybackStatus, Sound, UnitType};
 use crate::player::PlayerState;
 use std::path::PathBuf;
@@ -9,49 +10,21 @@ pub async fn search_sounds(
     query: String,
     category: Option<String>,
     unit_type: Option<String>,
+    catalog: State<'_, Catalog>,
 ) -> Result<Vec<Sound>, String> {
-    // TODO: Implement actual search from SQLite catalog
-    Ok(vec![])
+    catalog.search_sounds(&query, category.as_deref(), unit_type.as_deref())
 }
 
 /// Get all available categories
 #[tauri::command]
-pub async fn get_categories() -> Result<Vec<Category>, String> {
-    // TODO: Implement fetching categories from catalog
-    Ok(vec![
-        Category {
-            id: "unit_attack".to_string(),
-            name: "Unit Attacks".to_string(),
-            count: 0,
-        },
-        Category {
-            id: "unit_death".to_string(),
-            name: "Unit Deaths".to_string(),
-            count: 0,
-        },
-        Category {
-            id: "unit_hit".to_string(),
-            name: "Unit Hits".to_string(),
-            count: 0,
-        },
-        Category {
-            id: "combat".to_string(),
-            name: "Combat".to_string(),
-            count: 0,
-        },
-        Category {
-            id: "story_event".to_string(),
-            name: "Story Events".to_string(),
-            count: 0,
-        },
-    ])
+pub async fn get_categories(catalog: State<'_, Catalog>) -> Result<Vec<Category>, String> {
+    catalog.get_categories()
 }
 
 /// Get all available unit types
 #[tauri::command]
-pub async fn get_unit_types() -> Result<Vec<UnitType>, String> {
-    // TODO: Implement fetching unit types from catalog
-    Ok(vec![])
+pub async fn get_unit_types(catalog: State<'_, Catalog>) -> Result<Vec<UnitType>, String> {
+    catalog.get_unit_types()
 }
 
 /// Play a sound by its ID and file path

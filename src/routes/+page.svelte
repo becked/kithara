@@ -2,47 +2,94 @@
 	import { onMount } from 'svelte';
 	import SoundGrid from '$lib/components/SoundGrid.svelte';
 	import NowPlaying from '$lib/components/NowPlaying.svelte';
-	import { soundsState, loadTestSounds } from '$lib/stores/sounds.svelte';
+	import Search from '$lib/components/Search.svelte';
+	import CategorySidebar from '$lib/components/CategorySidebar.svelte';
+	import UnitFilter from '$lib/components/UnitFilter.svelte';
+	import { soundsState, filterState, initializeSounds, fetchSounds } from '$lib/stores/sounds.svelte';
 
 	let tauriAvailable = $state(false);
+	let initialized = $state(false);
+
+	// Re-fetch sounds when filters change (after initialization)
+	$effect(() => {
+		// Access all filter values to track them as dependencies
+		const query = filterState.query;
+		const category = filterState.category;
+		const unitType = filterState.unitType;
+
+		if (tauriAvailable && initialized) {
+			fetchSounds();
+		}
+	});
 
 	onMount(async () => {
-		// Check if we're running in Tauri
 		if ('__TAURI__' in window) {
 			tauriAvailable = true;
-			await loadTestSounds();
+			await initializeSounds();
+			initialized = true;
 		}
 	});
 </script>
 
-<main>
-	<header>
-		<h1>Kithara</h1>
-		<p class="subtitle">Old World Soundboard</p>
-	</header>
-
-	{#if soundsState.loading}
-		<div class="loading">Loading sounds...</div>
-	{:else if soundsState.error}
-		<div class="error">{soundsState.error}</div>
-	{:else if !tauriAvailable}
-		<div class="warning">
-			<p>Running in browser mode</p>
-			<p class="hint">Run with <code>npm run tauri dev</code> for full functionality</p>
-		</div>
-	{:else}
-		<SoundGrid sounds={soundsState.sounds} />
+<div class="app-layout">
+	<!-- Sidebar -->
+	{#if tauriAvailable}
+		<CategorySidebar categories={soundsState.categories} />
 	{/if}
 
+	<!-- Main content -->
+	<main class="main-content">
+		<header>
+			<div class="header-top">
+				<div class="title-area">
+					<h1>Kithara</h1>
+					<p class="subtitle">Old World Soundboard</p>
+				</div>
+			</div>
+			{#if tauriAvailable}
+				<div class="header-controls">
+					<Search />
+					<UnitFilter unitTypes={soundsState.unitTypes} />
+				</div>
+			{/if}
+		</header>
+
+		{#if soundsState.loading && !initialized}
+			<div class="status-message">Loading sounds...</div>
+		{:else if soundsState.error}
+			<div class="status-message error">{soundsState.error}</div>
+		{:else if !tauriAvailable}
+			<div class="status-message">
+				<p>Running in browser mode</p>
+				<p class="hint">Run with <code>npm run tauri dev</code> for full functionality</p>
+			</div>
+		{:else if soundsState.sounds.length === 0}
+			<div class="status-message">
+				<p>No sounds found</p>
+				{#if filterState.query || filterState.category || filterState.unitType}
+					<p class="hint">Try adjusting your filters</p>
+				{/if}
+			</div>
+		{:else}
+			<SoundGrid sounds={soundsState.sounds} />
+		{/if}
+	</main>
+
 	<NowPlaying />
-</main>
+</div>
 
 <style>
-	main {
+	.app-layout {
+		display: flex;
 		height: 100vh;
+		padding-bottom: 60px; /* Space for NowPlaying bar */
+	}
+
+	.main-content {
+		flex: 1;
 		display: flex;
 		flex-direction: column;
-		padding-bottom: 60px; /* Space for NowPlaying bar */
+		min-width: 0; /* Prevent flex item from overflowing */
 	}
 
 	header {
@@ -51,7 +98,14 @@
 		flex-shrink: 0;
 	}
 
-	h1 {
+	.header-top {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 1rem;
+	}
+
+	.title-area h1 {
 		font-size: 1.5rem;
 		font-weight: 700;
 		color: var(--color-primary);
@@ -63,9 +117,19 @@
 		color: var(--color-text-muted);
 	}
 
-	.loading,
-	.error,
-	.warning {
+	.header-controls {
+		display: flex;
+		gap: 1rem;
+		align-items: center;
+	}
+
+	/* Search takes remaining space */
+	.header-controls :global(.search-container) {
+		flex: 1;
+		max-width: 400px;
+	}
+
+	.status-message {
 		padding: 2rem;
 		text-align: center;
 		flex: 1;
@@ -74,22 +138,19 @@
 		align-items: center;
 		justify-content: center;
 		gap: 0.5rem;
-	}
-
-	.error {
-		color: var(--color-primary);
-	}
-
-	.warning {
 		color: var(--color-text-muted);
 	}
 
-	.warning .hint {
+	.status-message.error {
+		color: var(--color-primary);
+	}
+
+	.status-message .hint {
 		font-size: 0.85rem;
 		opacity: 0.7;
 	}
 
-	.warning code {
+	.status-message code {
 		background: var(--color-bg-secondary);
 		padding: 0.2rem 0.5rem;
 		border-radius: var(--radius-sm);
