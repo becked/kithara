@@ -1,0 +1,25 @@
+node_modules
+.svelte-kit
+build
+dist
+
+# Rust/Tauri
+src-tauri/target
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.*
+!.env.example
