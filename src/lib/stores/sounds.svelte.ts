@@ -47,6 +47,29 @@ export const playerState = $state<{
 let playbackTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 /**
+ * Schedule a check for playback completion.
+ * If audio is still playing when checked, reschedules another check.
+ */
+function schedulePlaybackCheck(delayMs: number): void {
+	playbackTimeoutId = setTimeout(async () => {
+		try {
+			const status = await getPlaybackStatus();
+			if (!status.isPlaying) {
+				playerState.isPlaying = false;
+				playerState.currentSound = null;
+			} else {
+				// Audio still playing - check again shortly
+				schedulePlaybackCheck(100);
+			}
+		} catch {
+			// If we can't get status, assume playback finished
+			playerState.isPlaying = false;
+			playerState.currentSound = null;
+		}
+	}, delayMs);
+}
+
+/**
  * Load categories from the backend.
  */
 export async function loadCategories(): Promise<void> {
@@ -134,19 +157,7 @@ export async function playSoundAction(sound: Sound): Promise<void> {
 		// Set timer to check when playback should be done
 		// Add 200ms buffer to account for timing differences
 		const durationMs = sound.duration * 1000 + 200;
-		playbackTimeoutId = setTimeout(async () => {
-			try {
-				const status = await getPlaybackStatus();
-				if (!status.isPlaying) {
-					playerState.isPlaying = false;
-					playerState.currentSound = null;
-				}
-			} catch {
-				// If we can't get status, assume playback finished
-				playerState.isPlaying = false;
-				playerState.currentSound = null;
-			}
-		}, durationMs);
+		schedulePlaybackCheck(durationMs);
 	} catch (error) {
 		playerState.isPlaying = false;
 		playerState.currentSound = null;
