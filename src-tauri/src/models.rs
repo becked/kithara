@@ -17,6 +17,7 @@ pub struct Sound {
     pub duration: f64,
     pub file_path: String,
     pub tags: Vec<String>,
+    pub is_favorite: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

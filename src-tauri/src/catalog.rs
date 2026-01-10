@@ -81,6 +81,28 @@ impl Catalog {
         )
         .map_err(|e| format!("Failed to create schema: {}", e))?;
 
+        // Migration: Add is_favorite column if it doesn't exist
+        // SQLite doesn't have ALTER TABLE ADD COLUMN IF NOT EXISTS,
+        // so we check if the column exists first
+        let has_favorite_column: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('sounds') WHERE name = 'is_favorite'",
+                [],
+                |row| row.get::<_, i32>(0),
+            )
+            .map(|count| count > 0)
+            .unwrap_or(false);
+
+        if !has_favorite_column {
+            conn.execute_batch(
+                r#"
+                ALTER TABLE sounds ADD COLUMN is_favorite INTEGER DEFAULT 0 NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_sounds_favorite ON sounds(is_favorite);
+                "#,
+            )
+            .map_err(|e| format!("Failed to add is_favorite column: {}", e))?;
+        }
+
         Ok(())
     }
 
@@ -101,7 +123,7 @@ impl Catalog {
         let sql = if use_fts {
             let mut sql = String::from(
                 "SELECT s.id, s.event_name, s.display_name, s.category,
-                        s.unit_type, s.subcategory, s.duration_ms, s.file_path, s.tags
+                        s.unit_type, s.subcategory, s.duration_ms, s.file_path, s.tags, s.is_favorite
                  FROM sounds s
                  JOIN sounds_fts fts ON s.rowid = fts.rowid
                  WHERE sounds_fts MATCH ?1",
@@ -122,7 +144,7 @@ impl Catalog {
         } else {
             let mut sql = String::from(
                 "SELECT s.id, s.event_name, s.display_name, s.category,
-                        s.unit_type, s.subcategory, s.duration_ms, s.file_path, s.tags
+                        s.unit_type, s.subcategory, s.duration_ms, s.file_path, s.tags, s.is_favorite
                  FROM sounds s
                  WHERE 1=1",
             );
@@ -234,12 +256,13 @@ impl Catalog {
         let tags_json = serde_json::to_string(&sound.tags)
             .map_err(|e| format!("Failed to serialize tags: {}", e))?;
         let duration_ms = (sound.duration * 1000.0) as i64;
+        let is_favorite_int = if sound.is_favorite { 1 } else { 0 };
 
         conn.execute(
             "INSERT OR REPLACE INTO sounds
              (id, event_name, display_name, category, unit_type, subcategory,
-              duration_ms, file_path, tags)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+              duration_ms, file_path, tags, is_favorite)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 sound.id,
                 sound.event_name,
@@ -250,11 +273,33 @@ impl Catalog {
                 duration_ms,
                 sound.file_path,
                 tags_json,
+                is_favorite_int,
             ],
         )
         .map_err(|e| format!("Failed to insert sound: {}", e))?;
 
         Ok(())
+    }
+
+    /// Toggles the favorite status of a sound. Returns the new favorite state.
+    pub fn toggle_favorite(&self, sound_id: &str) -> Result<bool, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        conn.execute(
+            "UPDATE sounds SET is_favorite = NOT is_favorite WHERE id = ?1",
+            params![sound_id],
+        )
+        .map_err(|e| format!("Failed to toggle favorite: {}", e))?;
+
+        let new_state: i32 = conn
+            .query_row(
+                "SELECT is_favorite FROM sounds WHERE id = ?1",
+                params![sound_id],
+                |row| row.get(0),
+            )
+            .map_err(|e| format!("Failed to get new favorite state: {}", e))?;
+
+        Ok(new_state != 0)
     }
 
     /// Returns count of sounds in the catalog.
@@ -264,6 +309,37 @@ impl Catalog {
             .query_row("SELECT COUNT(*) FROM sounds", [], |row| row.get(0))
             .map_err(|e| format!("Failed to count: {}", e))?;
         Ok(count)
+    }
+
+    /// Returns count of favorited sounds.
+    pub fn count_favorites(&self) -> Result<u64, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let count: u64 = conn
+            .query_row("SELECT COUNT(*) FROM sounds WHERE is_favorite = 1", [], |row| row.get(0))
+            .map_err(|e| format!("Failed to count favorites: {}", e))?;
+        Ok(count)
+    }
+
+    /// Returns all favorited sounds.
+    pub fn get_favorites(&self) -> Result<Vec<Sound>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, event_name, display_name, category, unit_type, subcategory,
+                        duration_ms, file_path, tags, is_favorite
+                 FROM sounds
+                 WHERE is_favorite = 1
+                 ORDER BY display_name ASC",
+            )
+            .map_err(|e| format!("Failed to prepare: {}", e))?;
+
+        let rows = stmt
+            .query_map([], row_to_sound)
+            .map_err(|e| format!("Query failed: {}", e))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect: {}", e))
     }
 }
 
@@ -275,6 +351,7 @@ fn row_to_sound(row: &rusqlite::Row) -> rusqlite::Result<Sound> {
         .unwrap_or_default();
 
     let duration_ms: i64 = row.get(6)?;
+    let is_favorite: i32 = row.get(9)?;
 
     Ok(Sound {
         id: row.get(0)?,
@@ -286,6 +363,7 @@ fn row_to_sound(row: &rusqlite::Row) -> rusqlite::Result<Sound> {
         duration: duration_ms as f64 / 1000.0,
         file_path: row.get(7)?,
         tags,
+        is_favorite: is_favorite != 0,
     })
 }
 

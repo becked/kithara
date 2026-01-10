@@ -31,6 +31,9 @@ pub fn run() {
             commands::search_sounds,
             commands::get_categories,
             commands::get_unit_types,
+            commands::toggle_favorite,
+            commands::get_favorites_count,
+            commands::get_favorites,
             commands::play_sound,
             commands::stop_sound,
             commands::get_playback_status,
@@ -86,6 +89,7 @@ fn seed_test_sounds(app: &tauri::App) -> Result<(), String> {
                 .to_string_lossy()
                 .to_string(),
             tags: vec!["test".to_string(), "short".to_string()],
+            is_favorite: false,
         },
         models::Sound {
             id: "test-medium".to_string(),
@@ -100,6 +104,7 @@ fn seed_test_sounds(app: &tauri::App) -> Result<(), String> {
                 .to_string_lossy()
                 .to_string(),
             tags: vec!["test".to_string(), "medium".to_string()],
+            is_favorite: false,
         },
         models::Sound {
             id: "test-long".to_string(),
@@ -114,6 +119,7 @@ fn seed_test_sounds(app: &tauri::App) -> Result<(), String> {
                 .to_string_lossy()
                 .to_string(),
             tags: vec!["test".to_string(), "long".to_string()],
+            is_favorite: false,
         },
     ];
 

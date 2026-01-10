@@ -20,6 +20,7 @@
 		const query = filterState.query;
 		const category = filterState.category;
 		const unitType = filterState.unitType;
+		const showFavoritesOnly = filterState.showFavoritesOnly;
 
 		if (tauriAvailable && initialized && !needsExtraction) {
 			fetchSounds();
@@ -80,7 +81,7 @@
 	<div class="app-layout">
 		<!-- Sidebar -->
 		{#if tauriAvailable}
-			<CategorySidebar categories={soundsState.categories} />
+			<CategorySidebar categories={soundsState.categories} favoritesCount={soundsState.favoritesCount} />
 		{/if}
 
 		<!-- Main content -->
@@ -112,7 +113,9 @@
 			{:else if soundsState.sounds.length === 0}
 				<div class="status-message">
 					<p>No sounds found</p>
-					{#if filterState.query || filterState.category || filterState.unitType}
+					{#if filterState.showFavoritesOnly}
+						<p class="hint">No favorites yet. Click the heart icon on any sound to add it.</p>
+					{:else if filterState.query || filterState.category || filterState.unitType}
 						<p class="hint">Try adjusting your filters</p>
 					{/if}
 				</div>

@@ -218,6 +218,7 @@ pub async fn run_extraction(
                     duration: 0.0, // Duration not available from file metadata
                     file_path: output_path.to_string_lossy().to_string(),
                     tags: build_tags(&file_info.short_name, &category, unit_type.as_deref()),
+                    is_favorite: false,
                 };
 
                 if let Err(e) = catalog.insert_sound(&sound) {

@@ -2,17 +2,30 @@
 	import type { Category } from '$lib/api';
 	import { filterState } from '$lib/stores/sounds.svelte';
 
-	let { categories }: { categories: Category[] } = $props();
+	let {
+		categories,
+		favoritesCount = 0
+	}: { categories: Category[]; favoritesCount?: number } = $props();
 
 	// Total count across all categories
 	let totalCount = $derived(categories.reduce((sum, cat) => sum + cat.count, 0));
 
+	function handleFavoritesClick() {
+		filterState.showFavoritesOnly = true;
+		filterState.category = null;
+	}
+
 	function handleCategoryClick(categoryId: string | null) {
+		filterState.showFavoritesOnly = false;
 		filterState.category = categoryId;
 	}
 
-	function isSelected(categoryId: string | null): boolean {
-		return filterState.category === categoryId;
+	function isFavoritesSelected(): boolean {
+		return filterState.showFavoritesOnly;
+	}
+
+	function isCategorySelected(categoryId: string | null): boolean {
+		return !filterState.showFavoritesOnly && filterState.category === categoryId;
 	}
 </script>
 
@@ -22,11 +35,26 @@
 	</div>
 
 	<ul class="category-list">
+		<!-- Favorites option -->
+		{#if favoritesCount > 0}
+			<li>
+				<button
+					class="category-item"
+					class:selected={isFavoritesSelected()}
+					onclick={handleFavoritesClick}
+				>
+					<span class="category-name">Favorites</span>
+					<span class="category-count">{favoritesCount}</span>
+				</button>
+			</li>
+			<li class="divider"></li>
+		{/if}
+
 		<!-- All Sounds option -->
 		<li>
 			<button
 				class="category-item"
-				class:selected={isSelected(null)}
+				class:selected={isCategorySelected(null)}
 				onclick={() => handleCategoryClick(null)}
 			>
 				<span class="category-name">All Sounds</span>
@@ -38,7 +66,7 @@
 			<li>
 				<button
 					class="category-item"
-					class:selected={isSelected(category.id)}
+					class:selected={isCategorySelected(category.id)}
 					onclick={() => handleCategoryClick(category.id)}
 				>
 					<span class="category-name">{category.name}</span>
@@ -78,6 +106,13 @@
 		list-style: none;
 		padding: 0.5rem 0;
 		margin: 0;
+	}
+
+	.divider {
+		height: 1px;
+		background: var(--color-border);
+		margin: 0.5rem 1rem;
+		opacity: 0.5;
 	}
 
 	.category-item {

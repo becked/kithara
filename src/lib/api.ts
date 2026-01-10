@@ -21,6 +21,18 @@ export async function getUnitTypes(): Promise<UnitType[]> {
 	return invoke('get_unit_types');
 }
 
+export async function toggleFavorite(soundId: string): Promise<boolean> {
+	return invoke('toggle_favorite', { soundId });
+}
+
+export async function getFavoritesCount(): Promise<number> {
+	return invoke('get_favorites_count');
+}
+
+export async function getFavorites(): Promise<Sound[]> {
+	return invoke('get_favorites');
+}
+
 export async function playSound(id: string, filePath: string): Promise<void> {
 	return invoke('play_sound', { id, filePath });
 }

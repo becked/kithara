@@ -29,6 +29,27 @@ pub async fn get_unit_types(catalog: State<'_, Catalog>) -> Result<Vec<UnitType>
     catalog.get_unit_types()
 }
 
+/// Toggle favorite status for a sound
+#[tauri::command]
+pub async fn toggle_favorite(
+    sound_id: String,
+    catalog: State<'_, Catalog>,
+) -> Result<bool, String> {
+    catalog.toggle_favorite(&sound_id)
+}
+
+/// Get the count of favorited sounds
+#[tauri::command]
+pub async fn get_favorites_count(catalog: State<'_, Catalog>) -> Result<u64, String> {
+    catalog.count_favorites()
+}
+
+/// Get all favorited sounds
+#[tauri::command]
+pub async fn get_favorites(catalog: State<'_, Catalog>) -> Result<Vec<Sound>, String> {
+    catalog.get_favorites()
+}
+
 /// Play a sound by its ID and file path
 #[tauri::command]
 pub async fn play_sound(

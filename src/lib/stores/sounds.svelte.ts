@@ -5,7 +5,10 @@ import {
 	getUnitTypes as apiGetUnitTypes,
 	playSound as apiPlaySound,
 	stopSound as apiStopSound,
-	getPlaybackStatus
+	getPlaybackStatus,
+	toggleFavorite as apiToggleFavorite,
+	getFavoritesCount as apiGetFavoritesCount,
+	getFavorites as apiGetFavorites
 } from '$lib/api';
 
 // Sounds state using Svelte 5 runes
@@ -13,12 +16,14 @@ export const soundsState = $state<{
 	sounds: Sound[];
 	categories: Category[];
 	unitTypes: UnitType[];
+	favoritesCount: number;
 	loading: boolean;
 	error: string | null;
 }>({
 	sounds: [],
 	categories: [],
 	unitTypes: [],
+	favoritesCount: 0,
 	loading: false,
 	error: null
 });
@@ -28,10 +33,12 @@ export const filterState = $state<{
 	query: string;
 	category: string | null;
 	unitType: string | null;
+	showFavoritesOnly: boolean;
 }>({
 	query: '',
 	category: null,
-	unitType: null
+	unitType: null,
+	showFavoritesOnly: false
 });
 
 // Player state
@@ -94,6 +101,17 @@ export async function loadUnitTypes(): Promise<void> {
 }
 
 /**
+ * Load favorites count from the backend.
+ */
+export async function loadFavoritesCount(): Promise<void> {
+	try {
+		soundsState.favoritesCount = await apiGetFavoritesCount();
+	} catch (error) {
+		console.error('Failed to load favorites count:', error);
+	}
+}
+
+/**
  * Fetch sounds based on current filter state.
  * This is the main search function that respects all filters.
  */
@@ -102,11 +120,16 @@ export async function fetchSounds(): Promise<void> {
 	soundsState.error = null;
 
 	try {
-		soundsState.sounds = await apiSearchSounds(
-			filterState.query,
-			filterState.category ?? undefined,
-			filterState.unitType ?? undefined
-		);
+		if (filterState.showFavoritesOnly) {
+			// Fetch all favorites from the backend
+			soundsState.sounds = await apiGetFavorites();
+		} else {
+			soundsState.sounds = await apiSearchSounds(
+				filterState.query,
+				filterState.category ?? undefined,
+				filterState.unitType ?? undefined
+			);
+		}
 	} catch (error) {
 		console.error('Failed to fetch sounds:', error);
 		soundsState.error = `Failed to fetch sounds: ${error}`;
@@ -117,7 +140,7 @@ export async function fetchSounds(): Promise<void> {
 }
 
 /**
- * Initialize the store by loading categories, unit types, and initial sounds.
+ * Initialize the store by loading categories, unit types, favorites count, and initial sounds.
  * Call this once when the app mounts.
  */
 export async function initializeSounds(): Promise<void> {
@@ -125,8 +148,8 @@ export async function initializeSounds(): Promise<void> {
 	soundsState.error = null;
 
 	try {
-		// Load categories and unit types in parallel
-		await Promise.all([loadCategories(), loadUnitTypes()]);
+		// Load categories, unit types, and favorites count in parallel
+		await Promise.all([loadCategories(), loadUnitTypes(), loadFavoritesCount()]);
 
 		// Then fetch initial sounds
 		await fetchSounds();
@@ -183,5 +206,30 @@ export async function stopSoundAction(): Promise<void> {
 		await apiStopSound();
 	} catch (error) {
 		soundsState.error = `Failed to stop sound: ${error}`;
+	}
+}
+
+/**
+ * Toggle favorite status for a sound.
+ * Updates both backend and local state optimistically.
+ */
+export async function toggleFavoriteAction(soundId: string): Promise<void> {
+	// Find the sound in the current list
+	const soundIndex = soundsState.sounds.findIndex((s) => s.id === soundId);
+	if (soundIndex === -1) return;
+
+	// Optimistically update local state
+	const previousState = soundsState.sounds[soundIndex].isFavorite;
+	const previousCount = soundsState.favoritesCount;
+	soundsState.sounds[soundIndex].isFavorite = !previousState;
+	soundsState.favoritesCount += previousState ? -1 : 1;
+
+	try {
+		await apiToggleFavorite(soundId);
+	} catch (error) {
+		// Revert on failure
+		soundsState.sounds[soundIndex].isFavorite = previousState;
+		soundsState.favoritesCount = previousCount;
+		soundsState.error = `Failed to toggle favorite: ${error}`;
 	}
 }
