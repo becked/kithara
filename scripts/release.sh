@@ -26,9 +26,24 @@ if ! git diff-index --quiet HEAD --; then
   exit 1
 fi
 
+echo "Updating version to $VERSION..."
+
+# Update version in tauri.conf.json
+sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
+
+# Update version in package.json
+sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
+
+# Update version in Cargo.toml
+sed -i '' "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
+
+# Commit version bump
+git add src-tauri/tauri.conf.json package.json src-tauri/Cargo.toml
+git commit -m "Bump version to $VERSION"
+
 echo "Creating release $TAG..."
 git tag "$TAG"
-git push origin "$TAG"
+git push origin main "$TAG"
 
 echo ""
 echo "Release $TAG triggered!"
