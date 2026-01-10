@@ -89,25 +89,31 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Download sidecar binaries
+      - name: Download Windows audio tools
         shell: pwsh
         run: |
-          # Download vgmstream-cli
-          Write-Host "Downloading vgmstream-cli..."
+          # Create resource directories
+          New-Item -ItemType Directory -Force -Path src-tauri/resources-win/vgmstream
+          New-Item -ItemType Directory -Force -Path src-tauri/resources-win/ffmpeg
+
+          # Download vgmstream (all files including DLLs)
+          Write-Host "Downloading vgmstream..."
           Invoke-WebRequest -Uri "https://github.com/vgmstream/vgmstream/releases/latest/download/vgmstream-win64.zip" -OutFile vgmstream.zip
-          Expand-Archive vgmstream.zip -DestinationPath vgmstream
-          Copy-Item vgmstream/vgmstream-cli.exe src-tauri/binaries/vgmstream-cli-x86_64-pc-windows-msvc.exe
+          Expand-Archive vgmstream.zip -DestinationPath vgmstream-extract
+          Copy-Item vgmstream-extract/* src-tauri/resources-win/vgmstream/ -Recurse
 
           # Download ffmpeg
           Write-Host "Downloading ffmpeg..."
           Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg-extract
           $ffmpegDir = Get-ChildItem ffmpeg-extract -Directory | Select-Object -First 1
-          Copy-Item "$($ffmpegDir.FullName)/bin/ffmpeg.exe" src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
+          Copy-Item "$($ffmpegDir.FullName)/bin/ffmpeg.exe" src-tauri/resources-win/ffmpeg/
 
-          # Verify binaries exist
-          Write-Host "Verifying binaries..."
-          Get-ChildItem src-tauri/binaries/
+          # Verify files
+          Write-Host "vgmstream files:"
+          Get-ChildItem src-tauri/resources-win/vgmstream/
+          Write-Host "ffmpeg files:"
+          Get-ChildItem src-tauri/resources-win/ffmpeg/
 
       - name: Install frontend dependencies
         run: npm ci

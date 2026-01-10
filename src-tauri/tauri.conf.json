@@ -36,7 +36,11 @@
 			"icons/icon.icns",
 			"icons/icon.ico"
 		],
-		"resources": ["resources/**/*"],
+		"resources": [
+			"resources/**/*",
+			"resources-win/vgmstream/*",
+			"resources-win/ffmpeg/*"
+		],
 		"externalBin": [
 			"binaries/vgmstream-cli",
 			"binaries/ffmpeg"
