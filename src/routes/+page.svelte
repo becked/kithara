@@ -88,9 +88,12 @@
 		<main class="main-content">
 			<header>
 				<div class="header-top">
-					<div class="title-area">
-						<h1>Kithara</h1>
-						<p class="subtitle">Old World Soundboard</p>
+					<div class="branding">
+						<img src="/kithara-transparent.png" alt="Kithara" class="app-icon" />
+						<div class="title-area">
+							<h1>Kithara</h1>
+							<p class="subtitle">Old World Soundboard</p>
+						</div>
 					</div>
 				</div>
 				{#if tauriAvailable}
@@ -162,6 +165,17 @@
 		justify-content: space-between;
 		align-items: flex-start;
 		margin-bottom: 1rem;
+	}
+
+	.branding {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.app-icon {
+		height: 48px;
+		width: auto;
 	}
 
 	.title-area h1 {
