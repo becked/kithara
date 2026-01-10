@@ -109,11 +109,18 @@ jobs:
           $ffmpegDir = Get-ChildItem ffmpeg-extract -Directory | Select-Object -First 1
           Copy-Item "$($ffmpegDir.FullName)/bin/ffmpeg.exe" src-tauri/resources-win/ffmpeg/
 
+          # Also copy to binaries folder for Tauri's externalBin requirement
+          # (Tauri needs these to exist at build time, even though we use resources at runtime)
+          Copy-Item vgmstream-extract/vgmstream-cli.exe src-tauri/binaries/vgmstream-cli-x86_64-pc-windows-msvc.exe
+          Copy-Item "$($ffmpegDir.FullName)/bin/ffmpeg.exe" src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
+
           # Verify files
-          Write-Host "vgmstream files:"
+          Write-Host "vgmstream resources:"
           Get-ChildItem src-tauri/resources-win/vgmstream/
-          Write-Host "ffmpeg files:"
+          Write-Host "ffmpeg resources:"
           Get-ChildItem src-tauri/resources-win/ffmpeg/
+          Write-Host "sidecar binaries:"
+          Get-ChildItem src-tauri/binaries/
 
       - name: Install frontend dependencies
         run: npm ci
