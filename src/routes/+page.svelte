@@ -4,7 +4,6 @@
 	import NowPlaying from '$lib/components/NowPlaying.svelte';
 	import Search from '$lib/components/Search.svelte';
 	import CategorySidebar from '$lib/components/CategorySidebar.svelte';
-	import UnitFilter from '$lib/components/UnitFilter.svelte';
 	import ExtractionProgress from '$lib/components/ExtractionProgress.svelte';
 	import { soundsState, filterState, initializeSounds, fetchSounds } from '$lib/stores/sounds.svelte';
 	import { getExtractionStatus } from '$lib/api';
@@ -19,7 +18,6 @@
 		// Access all filter values to track them as dependencies
 		const query = filterState.query;
 		const category = filterState.category;
-		const unitType = filterState.unitType;
 		const showFavoritesOnly = filterState.showFavoritesOnly;
 
 		if (tauriAvailable && initialized && !needsExtraction) {
@@ -99,7 +97,6 @@
 				{#if tauriAvailable}
 					<div class="header-controls">
 						<Search />
-						<UnitFilter unitTypes={soundsState.unitTypes} />
 					</div>
 				{/if}
 			</header>
@@ -118,7 +115,7 @@
 					<p>No sounds found</p>
 					{#if filterState.showFavoritesOnly}
 						<p class="hint">No favorites yet. Click the heart icon on any sound to add it.</p>
-					{:else if filterState.query || filterState.category || filterState.unitType}
+					{:else if filterState.query || filterState.category}
 						<p class="hint">Try adjusting your filters</p>
 					{/if}
 				</div>
