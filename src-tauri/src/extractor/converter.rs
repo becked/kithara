@@ -12,6 +12,12 @@ use tauri_plugin_shell::ShellExt;
 #[cfg(target_os = "windows")]
 use tauri::Manager;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 /// Convert WEM file to OGG via two-step pipeline
 pub async fn convert_wem_to_ogg(
     app: &AppHandle,
@@ -165,6 +171,7 @@ async fn convert_wem_to_wav(
 
     let output = tokio::process::Command::new(&vgmstream_exe)
         .args(["-o", wav_str, wem_str])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .await
         .map_err(|e| format!("Failed to run vgmstream-cli: {}", e))?;
@@ -233,6 +240,7 @@ async fn convert_wav_to_ogg(
             "error",
             ogg_str,
         ])
+        .creation_flags(CREATE_NO_WINDOW)
         .output()
         .await
         .map_err(|e| format!("Failed to run ffmpeg: {}", e))?;
