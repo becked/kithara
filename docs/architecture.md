@@ -8,9 +8,12 @@ Kithara extracts and plays sound effects from Old World's Wwise audio system. It
 
 ## Platform Support
 
-- macOS (ARM64 and Intel)
-- Windows
-- Linux
+- macOS ARM64 (Apple Silicon) - **currently supported**
+- macOS Intel - planned
+- Windows - planned
+- Linux - planned
+
+Note: Only macOS ARM64 sidecar binaries are currently bundled. Other platforms require additional binary builds.
 
 ## Technology Stack
 
@@ -108,6 +111,10 @@ Archer, Axeman, Ballista, Battering Ram, Bireme, Camel, Caravan, Cataphract, Cha
 │  ├─ get_unit_types() → Vec<UnitType>                            │
 │  ├─ play_sound(id) → ()                                         │
 │  ├─ stop_sound() → ()                                           │
+│  ├─ get_playback_status() → PlaybackStatus                      │
+│  ├─ toggle_favorite(id) → Sound                                 │
+│  ├─ get_favorites_count() → i32                                 │
+│  ├─ get_favorites() → Vec<Sound>                                │
 │  ├─ start_extraction(game_path) → ()                            │
 │  ├─ get_extraction_status() → ExtractionStatus                  │
 │  ├─ cancel_extraction() → ()                                    │
@@ -119,9 +126,9 @@ Archer, Axeman, Ballista, Battering Ram, Bireme, Camel, Caravan, Cataphract, Cha
 │  └─ count_sounds() for extraction detection                     │
 │                                                                  │
 │  player.rs                                                       │
-│  ├─ rodio-based audio playback                                  │
+│  ├─ rodio-based audio playback (AudioPlayer struct)             │
 │  ├─ play/stop with Sink management                              │
-│  └─ playback state via Mutex<PlayerState>                       │
+│  └─ playback state via Mutex<AudioStatus>                       │
 │                                                                  │
 │  extractor/                                                      │
 │  ├─ mod.rs: ExtractionManager, run_extraction orchestrator      │
@@ -144,10 +151,9 @@ kithara/
 │   ├── tauri.conf.json
 │   ├── capabilities/
 │   │   └── default.json             # Permissions including shell:allow-execute
-│   ├── binaries/                    # Sidecar binaries (platform-specific)
+│   ├── binaries/                    # Sidecar binaries (macOS ARM64 only)
 │   │   ├── vgmstream-cli-aarch64-apple-darwin
-│   │   ├── ffmpeg-aarch64-apple-darwin
-│   │   └── ...
+│   │   └── ffmpeg-aarch64-apple-darwin
 │   └── src/
 │       ├── main.rs                  # Tauri entry point
 │       ├── lib.rs                   # App setup, managed state
@@ -176,7 +182,6 @@ kithara/
 │   │       ├── SoundButton.svelte
 │   │       ├── Search.svelte
 │   │       ├── CategorySidebar.svelte
-│   │       ├── UnitFilter.svelte
 │   │       ├── NowPlaying.svelte
 │   │       └── ExtractionProgress.svelte
 │   └── routes/
@@ -199,9 +204,10 @@ interface Sound {
   category: string;         // e.g., "combat", "movement", "vocal"
   unitType: string | null;  // e.g., "Slinger", null for non-unit sounds
   subcategory: string;      // e.g., "cmbt_rng_slinger"
-  duration: number;         // seconds (0 if not available)
+  durationMs: number;       // milliseconds (0 if not available)
   filePath: string;         // absolute path to OGG file
   tags: string[];           // searchable tags
+  isFavorite: boolean;      // user-favorited sound
 }
 ```
 
@@ -227,13 +233,21 @@ CREATE TABLE sounds (
   category TEXT NOT NULL,
   unit_type TEXT,
   subcategory TEXT,
-  duration REAL NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
   file_path TEXT NOT NULL,
-  tags TEXT  -- JSON array
+  tags TEXT,              -- JSON array
+  is_favorite INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX idx_sounds_category ON sounds(category);
 CREATE INDEX idx_sounds_unit_type ON sounds(unit_type);
+CREATE INDEX idx_sounds_is_favorite ON sounds(is_favorite);
+
+-- Key-value metadata storage
+CREATE TABLE metadata (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 
 -- Full-text search
 CREATE VIRTUAL TABLE sounds_fts USING fts5(
@@ -337,7 +351,7 @@ Two-step conversion is required because vgmstream-cli cannot output OGG directly
 
 ```toml
 [dependencies]
-tauri = { version = "2", features = ["devtools"] }
+tauri = "2"
 tauri-plugin-shell = "2"          # Sidecar execution
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -345,9 +359,11 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 rodio = { version = "0.19", features = ["vorbis"] }
 quick-xml = "0.37"                # Parse soundbank XMLs
 byteorder = "1"                   # Parse binary BNK files
-directories = "6"                 # Cross-platform app directories
+directories = "5"                 # Cross-platform app directories
 dirs = "6"                        # Home directory detection
 tokio = { version = "1", features = ["sync"] }
+walkdir = "2"                     # Filesystem traversal
+thiserror = "2"                   # Error handling
 
 [dev-dependencies]
 ts-rs = "10"                      # Generate TypeScript types
@@ -363,6 +379,7 @@ export const soundsState = $state({
   sounds: [] as Sound[],
   categories: [] as Category[],
   unitTypes: [] as UnitType[],
+  favoritesCount: 0,
   loading: false,
   error: null as string | null
 });
@@ -370,7 +387,8 @@ export const soundsState = $state({
 export const filterState = $state({
   query: '',
   category: null as string | null,
-  unitType: null as string | null
+  unitType: null as string | null,
+  showFavoritesOnly: false
 });
 
 export const playerState = $state({
@@ -384,7 +402,7 @@ export const playerState = $state({
 ```rust
 // Shared state via Arc + Mutex
 .manage(catalog)                           // Arc<Catalog>
-.manage(player)                            // Arc<Mutex<Player>>
+.manage(player_state)                      // Arc<Mutex<AudioStatus>>
 .manage(Arc::new(ExtractionManager::new())) // Thread-safe extraction state
 ```
 
@@ -397,7 +415,7 @@ export const playerState = $state({
 - [ ] Sound preview on hover
 
 ### v1.2 - User Features
-- [ ] Favorites system (star sounds, filter by favorites)
+- [x] Favorites system (star sounds, filter by favorites)
 - [ ] Custom playlists/soundboards
 - [ ] Re-extraction menu option (for game updates)
 - [ ] Search history
