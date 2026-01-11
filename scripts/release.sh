@@ -37,8 +37,11 @@ sed -i '' "s/\"version\": \"[^\"]*\"/\"version\": \"$VERSION\"/" package.json
 # Update version in Cargo.toml
 sed -i '' "s/^version = \"[^\"]*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
 
+# Update Cargo.lock
+(cd src-tauri && cargo check --quiet)
+
 # Commit version bump
-git add src-tauri/tauri.conf.json package.json src-tauri/Cargo.toml
+git add src-tauri/tauri.conf.json package.json src-tauri/Cargo.toml src-tauri/Cargo.lock
 git commit -m "Bump version to $VERSION"
 
 echo "Creating release $TAG..."
