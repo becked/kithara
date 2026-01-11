@@ -43,8 +43,14 @@ pub fn run() {
             commands::detect_game_path,
         ])
         .setup(|app| {
-            // Seed test sounds if database is empty
             let catalog = app.state::<Catalog>();
+
+            // Run one-time data migrations
+            if let Err(e) = catalog.run_migrations() {
+                eprintln!("Warning: Failed to run migrations: {}", e);
+            }
+
+            // Seed test sounds if database is empty
             if let Ok(count) = catalog.count_sounds() {
                 if count == 0 {
                     println!("Database empty, seeding test sounds...");

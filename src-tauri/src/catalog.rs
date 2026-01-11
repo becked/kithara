@@ -106,6 +106,64 @@ impl Catalog {
         Ok(())
     }
 
+    /// Runs one-time data migrations. Should be called on app startup.
+    pub fn run_migrations(&self) -> Result<(), String> {
+        self.migrate_remove_excluded_sounds()?;
+        Ok(())
+    }
+
+    /// Migration: Remove sounds matching exclusion patterns (unreleased content).
+    /// Runs once, tracked via metadata table.
+    fn migrate_remove_excluded_sounds(&self) -> Result<(), String> {
+        const MIGRATION_KEY: &str = "migration_removed_excluded_sounds_v1";
+        const EXCLUSION_PATTERNS: &[&str] =
+            &["jungle", "huns", "yuezhi", "india", "migration", "monkey"];
+
+        // Check if migration already ran
+        if self.get_metadata(MIGRATION_KEY)?.is_some() {
+            return Ok(());
+        }
+
+        // Delete matching sounds and get file paths
+        let file_paths = self.delete_sounds_matching_patterns(EXCLUSION_PATTERNS)?;
+
+        // Delete files from disk
+        for path in file_paths {
+            let _ = std::fs::remove_file(&path);
+        }
+
+        // Mark migration as complete
+        self.set_metadata(MIGRATION_KEY, "done")?;
+
+        Ok(())
+    }
+
+    /// Gets a value from the metadata table.
+    fn get_metadata(&self, key: &str) -> Result<Option<String>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let result = conn.query_row(
+            "SELECT value FROM metadata WHERE key = ?1",
+            params![key],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(value) => Ok(Some(value)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(format!("Failed to get metadata: {}", e)),
+        }
+    }
+
+    /// Sets a value in the metadata table.
+    fn set_metadata(&self, key: &str, value: &str) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES (?1, ?2)",
+            params![key, value],
+        )
+        .map_err(|e| format!("Failed to set metadata: {}", e))?;
+        Ok(())
+    }
+
     /// Searches sounds using FTS5 with optional category/unit_type filters.
     /// Empty query returns all sounds (filtered by category/unit_type if provided).
     pub fn search_sounds(
@@ -340,6 +398,44 @@ impl Catalog {
 
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|e| format!("Failed to collect: {}", e))
+    }
+
+    /// Deletes sounds matching any of the given patterns (case-insensitive substring match on event_name).
+    /// Returns the file paths of deleted sounds so they can be removed from disk.
+    pub fn delete_sounds_matching_patterns(&self, patterns: &[&str]) -> Result<Vec<String>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        // Build WHERE clause for pattern matching
+        // Using LIKE with LOWER() for case-insensitive substring matching
+        let conditions: Vec<String> = patterns
+            .iter()
+            .map(|p| format!("LOWER(event_name) LIKE '%{}%'", p.to_lowercase()))
+            .collect();
+
+        if conditions.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let where_clause = conditions.join(" OR ");
+
+        // First, get the file paths of sounds to delete
+        let select_sql = format!("SELECT file_path FROM sounds WHERE {}", where_clause);
+        let mut stmt = conn
+            .prepare(&select_sql)
+            .map_err(|e| format!("Failed to prepare select: {}", e))?;
+
+        let file_paths: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| format!("Query failed: {}", e))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        // Delete the sounds from the database
+        let delete_sql = format!("DELETE FROM sounds WHERE {}", where_clause);
+        conn.execute(&delete_sql, [])
+            .map_err(|e| format!("Failed to delete sounds: {}", e))?;
+
+        Ok(file_paths)
     }
 }
 

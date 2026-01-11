@@ -182,6 +182,12 @@ pub async fn run_extraction(
         }
         let file_info = file_info.unwrap();
 
+        // Skip sounds matching exclusion patterns
+        if is_excluded(&file_info.short_name) {
+            processed += 1;
+            continue;
+        }
+
         // Extract WEM bytes to temp file
         let wem_path = temp_dir.join(format!("{}.wem", entry.file_id));
         if let Err(e) = bnk_parser::extract_wem_bytes(&entry, &wem_path) {
@@ -288,4 +294,13 @@ fn build_tags(event_name: &str, category: &str, unit_type: Option<&str>) -> Vec<
     }
 
     tags
+}
+
+/// Exclusion patterns for unreleased content (case-insensitive substrings)
+const EXCLUSION_PATTERNS: &[&str] = &["jungle", "huns", "yuezhi", "india", "migration", "monkey"];
+
+/// Check if a sound name matches any exclusion pattern (case-insensitive substring)
+fn is_excluded(name: &str) -> bool {
+    let name_lower = name.to_lowercase();
+    EXCLUSION_PATTERNS.iter().any(|p| name_lower.contains(p))
 }
