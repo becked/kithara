@@ -45,6 +45,11 @@ pub async fn convert_wem_to_ogg(
 // ============================================================================
 
 #[cfg(target_os = "macos")]
+const HOMEBREW_VGMSTREAM: &str = "/opt/homebrew/bin/vgmstream-cli";
+#[cfg(target_os = "macos")]
+const HOMEBREW_FFMPEG: &str = "/opt/homebrew/bin/ffmpeg";
+
+#[cfg(target_os = "macos")]
 async fn convert_wem_to_wav(
     _app: &AppHandle,
     wem_path: &Path,
@@ -57,7 +62,7 @@ async fn convert_wem_to_wav(
         .to_str()
         .ok_or_else(|| "Invalid WAV path".to_string())?;
 
-    let output = tokio::process::Command::new("vgmstream-cli")
+    let output = tokio::process::Command::new(HOMEBREW_VGMSTREAM)
         .args(["-o", wav_str, wem_str])
         .output()
         .await
@@ -97,7 +102,7 @@ async fn convert_wav_to_ogg(
         .to_str()
         .ok_or_else(|| "Invalid OGG path".to_string())?;
 
-    let output = tokio::process::Command::new("ffmpeg")
+    let output = tokio::process::Command::new(HOMEBREW_FFMPEG)
         .args([
             "-y",
             "-i",
@@ -357,27 +362,17 @@ async fn convert_wav_to_ogg(
 /// Returns a list of missing dependencies (empty if all are available).
 #[cfg(target_os = "macos")]
 pub async fn check_audio_dependencies() -> Vec<String> {
+    use std::path::Path;
+
     let mut missing = Vec::new();
 
-    // Check vgmstream-cli
-    if tokio::process::Command::new("which")
-        .arg("vgmstream-cli")
-        .output()
-        .await
-        .map(|o| !o.status.success())
-        .unwrap_or(true)
-    {
+    // Check vgmstream-cli at Homebrew path
+    if !Path::new(HOMEBREW_VGMSTREAM).exists() {
         missing.push("vgmstream".to_string());
     }
 
-    // Check ffmpeg
-    if tokio::process::Command::new("which")
-        .arg("ffmpeg")
-        .output()
-        .await
-        .map(|o| !o.status.success())
-        .unwrap_or(true)
-    {
+    // Check ffmpeg at Homebrew path
+    if !Path::new(HOMEBREW_FFMPEG).exists() {
         missing.push("ffmpeg".to_string());
     }
 
