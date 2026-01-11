@@ -158,6 +158,29 @@ pub async fn cancel_extraction(
     Ok(())
 }
 
+/// Clear the cache (database records and sounds folder) for rebuilding
+#[tauri::command]
+pub async fn clear_cache(
+    catalog: State<'_, Catalog>,
+    manager: State<'_, Arc<ExtractionManager>>,
+) -> Result<(), String> {
+    // Clear all database records
+    catalog.clear_all()?;
+
+    // Delete the sounds folder
+    let cache_dir = extractor::get_cache_dir()?;
+    let sounds_dir = cache_dir.join("sounds");
+    if sounds_dir.exists() {
+        std::fs::remove_dir_all(&sounds_dir)
+            .map_err(|e| format!("Failed to delete sounds folder: {}", e))?;
+    }
+
+    // Reset extraction state
+    manager.reset();
+
+    Ok(())
+}
+
 /// Detect the Old World game installation path
 #[tauri::command]
 pub async fn detect_game_path() -> Result<Option<String>, String> {

@@ -6,7 +6,7 @@
 	import CategorySidebar from '$lib/components/CategorySidebar.svelte';
 	import ExtractionProgress from '$lib/components/ExtractionProgress.svelte';
 	import { soundsState, filterState, initializeSounds, fetchSounds } from '$lib/stores/sounds.svelte';
-	import { getExtractionStatus } from '$lib/api';
+	import { getExtractionStatus, clearCache } from '$lib/api';
 
 	let tauriAvailable = $state(false);
 	let initialized = $state(false);
@@ -29,6 +29,15 @@
 		needsExtraction = false;
 		await initializeSounds();
 		initialized = true;
+	}
+
+	async function handleRebuildCache() {
+		try {
+			await clearCache();
+			needsExtraction = true;
+		} catch (e) {
+			console.error('Failed to clear cache:', e);
+		}
 	}
 
 	onMount(async () => {
@@ -93,6 +102,15 @@
 							<p class="subtitle">Old World Soundboard</p>
 						</div>
 					</div>
+					<button class="rebuild-button" onclick={handleRebuildCache} title="Rebuild Cache">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+							<path d="M3 3v5h5"/>
+							<path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+							<path d="M16 21h5v-5"/>
+						</svg>
+						Rebuild
+					</button>
 				</div>
 				{#if tauriAvailable}
 					<div class="header-controls">
@@ -185,6 +203,30 @@
 	.subtitle {
 		font-size: 0.9rem;
 		color: var(--color-text-muted);
+	}
+
+	.rebuild-button {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.75rem;
+		background: transparent;
+		color: var(--color-text-muted);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.rebuild-button:hover {
+		color: var(--color-text);
+		border-color: var(--color-text-muted);
+		background: var(--color-bg-secondary);
+	}
+
+	.rebuild-button svg {
+		flex-shrink: 0;
 	}
 
 	.header-controls {

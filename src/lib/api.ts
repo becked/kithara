@@ -57,6 +57,10 @@ export async function cancelExtraction(): Promise<void> {
 	return invoke('cancel_extraction');
 }
 
+export async function clearCache(): Promise<void> {
+	return invoke('clear_cache');
+}
+
 export async function detectGamePath(): Promise<string | null> {
 	return invoke('detect_game_path');
 }

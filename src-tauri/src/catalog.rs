@@ -400,6 +400,22 @@ impl Catalog {
             .map_err(|e| format!("Failed to collect: {}", e))
     }
 
+    /// Clears all sounds from the catalog and resets migration flags.
+    /// Used when rebuilding the cache.
+    pub fn clear_all(&self) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        // Delete all sounds (triggers will clean up FTS)
+        conn.execute("DELETE FROM sounds", [])
+            .map_err(|e| format!("Failed to clear sounds: {}", e))?;
+
+        // Reset migration flags so they run again on next extraction
+        conn.execute("DELETE FROM metadata", [])
+            .map_err(|e| format!("Failed to clear metadata: {}", e))?;
+
+        Ok(())
+    }
+
     /// Deletes sounds matching any of the given patterns (case-insensitive substring match on event_name).
     /// Returns the file paths of deleted sounds so they can be removed from disk.
     pub fn delete_sounds_matching_patterns(&self, patterns: &[&str]) -> Result<Vec<String>, String> {
