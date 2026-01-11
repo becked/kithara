@@ -1,6 +1,6 @@
 //! Audio conversion pipeline: WEM -> WAV -> OGG
 //! Uses vgmstream-cli and ffmpeg.
-//! - macOS: Sidecar for vgmstream-cli, bundled ffmpeg in resources
+//! - macOS: Sidecars for both vgmstream-cli and ffmpeg
 //! - Linux: Sidecar for vgmstream-cli, system ffmpeg (apt dependency)
 //! - Windows: Bundled resources (exe + DLLs)
 
@@ -10,7 +10,7 @@ use tauri::AppHandle;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use tauri_plugin_shell::ShellExt;
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 use tauri::Manager;
 
 #[cfg(target_os = "windows")]
@@ -93,20 +93,6 @@ async fn convert_wav_to_ogg(
     wav_path: &Path,
     ogg_path: &Path,
 ) -> Result<(), String> {
-    let resource_dir = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
-
-    let ffmpeg_bin = resource_dir.join("resources-mac").join("ffmpeg").join("ffmpeg");
-
-    if !ffmpeg_bin.exists() {
-        return Err(format!(
-            "ffmpeg not found at: {}",
-            ffmpeg_bin.display()
-        ));
-    }
-
     let wav_str = wav_path
         .to_str()
         .ok_or_else(|| "Invalid WAV path".to_string())?;
@@ -114,7 +100,10 @@ async fn convert_wav_to_ogg(
         .to_str()
         .ok_or_else(|| "Invalid OGG path".to_string())?;
 
-    let output = tokio::process::Command::new(&ffmpeg_bin)
+    let output = app
+        .shell()
+        .sidecar("ffmpeg")
+        .map_err(|e| format!("Failed to get ffmpeg sidecar: {}", e))?
         .args([
             "-y",
             "-i",

@@ -39,11 +39,11 @@
 		"resources": [
 			"resources/**/*",
 			"resources-win/vgmstream/*",
-			"resources-win/ffmpeg/*",
-			"resources-mac/ffmpeg/*"
+			"resources-win/ffmpeg/*"
 		],
 		"externalBin": [
-			"binaries/vgmstream-cli"
+			"binaries/vgmstream-cli",
+			"binaries/ffmpeg"
 		],
 		"macOS": {
 			"minimumSystemVersion": "10.15"
