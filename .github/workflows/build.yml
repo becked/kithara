@@ -32,13 +32,14 @@ jobs:
       - name: Download static ffmpeg for macOS
         run: |
           # Download static ffmpeg build for macOS ARM64
+          mkdir -p src-tauri/resources-mac/ffmpeg
           echo "Downloading static ffmpeg..."
           curl -L "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/7z" -o ffmpeg.7z
           7z x ffmpeg.7z
-          cp ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-          chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+          cp ffmpeg src-tauri/resources-mac/ffmpeg/ffmpeg
+          chmod +x src-tauri/resources-mac/ffmpeg/ffmpeg
           echo "ffmpeg downloaded:"
-          ls -la src-tauri/binaries/
+          ls -la src-tauri/resources-mac/ffmpeg/
 
       - name: Install frontend dependencies
         run: npm ci
