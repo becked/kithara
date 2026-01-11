@@ -140,8 +140,86 @@ jobs:
           name: kithara-windows-exe
           path: src-tauri/target/release/bundle/nsis/*.exe
 
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Download Linux audio tools
+        run: |
+          # Create resource directories
+          mkdir -p src-tauri/resources-linux/vgmstream
+          mkdir -p src-tauri/resources-linux/ffmpeg
+
+          # Download vgmstream
+          echo "Downloading vgmstream..."
+          wget -q "https://github.com/vgmstream/vgmstream/releases/latest/download/vgmstream-linux-cli.zip" -O vgmstream.zip
+          unzip -q vgmstream.zip -d src-tauri/resources-linux/vgmstream/
+          chmod +x src-tauri/resources-linux/vgmstream/vgmstream-cli
+
+          # Download ffmpeg static build
+          echo "Downloading ffmpeg..."
+          wget -q "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -O ffmpeg.tar.xz
+          tar -xf ffmpeg.tar.xz
+          cp ffmpeg-*-amd64-static/ffmpeg src-tauri/resources-linux/ffmpeg/
+          chmod +x src-tauri/resources-linux/ffmpeg/ffmpeg
+
+          # Copy to binaries folder for Tauri's externalBin requirement
+          cp src-tauri/resources-linux/vgmstream/vgmstream-cli src-tauri/binaries/vgmstream-cli-x86_64-unknown-linux-gnu
+          cp src-tauri/resources-linux/ffmpeg/ffmpeg src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+
+          # Verify files
+          echo "vgmstream resources:"
+          ls -la src-tauri/resources-linux/vgmstream/
+          echo "ffmpeg resources:"
+          ls -la src-tauri/resources-linux/ffmpeg/
+          echo "sidecar binaries:"
+          ls -la src-tauri/binaries/
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        run: npm run tauri build
+
+      - name: Upload Linux deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kithara-linux-deb
+          path: src-tauri/target/release/bundle/deb/*.deb
+
+      - name: Upload Linux AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kithara-linux-appimage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+
   release:
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, build-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -162,5 +240,7 @@ jobs:
             artifacts/**/*.dmg
             artifacts/**/*.msi
             artifacts/**/*.exe
+            artifacts/**/*.deb
+            artifacts/**/*.AppImage
           generate_release_notes: true
           draft: false

@@ -39,7 +39,9 @@
 		"resources": [
 			"resources/**/*",
 			"resources-win/vgmstream/*",
-			"resources-win/ffmpeg/*"
+			"resources-win/ffmpeg/*",
+			"resources-linux/vgmstream/*",
+			"resources-linux/ffmpeg/*"
 		],
 		"externalBin": [
 			"binaries/vgmstream-cli",
