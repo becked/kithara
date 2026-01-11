@@ -45,6 +45,12 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
+      - name: Sign ffmpeg resource
+        run: |
+          codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" src-tauri/resources-mac/ffmpeg/ffmpeg
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+
       - name: Build Tauri app
         run: npm run tauri build
         env:
