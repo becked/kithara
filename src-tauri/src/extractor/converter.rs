@@ -1,6 +1,7 @@
 //! Audio conversion pipeline: WEM -> WAV -> OGG
 //! Uses vgmstream-cli and ffmpeg.
-//! - macOS: Uses Tauri sidecars (single static binaries)
+//! - macOS: Uses Tauri sidecars for both tools
+//! - Linux: Uses sidecar for vgmstream-cli, system ffmpeg (apt dependency)
 //! - Windows: Uses bundled resources (exe + DLLs)
 
 use std::path::Path;
@@ -86,7 +87,7 @@ async fn convert_wem_to_wav(
     Ok(())
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "macos")]
 async fn convert_wav_to_ogg(
     app: &AppHandle,
     wav_path: &Path,
@@ -103,6 +104,56 @@ async fn convert_wav_to_ogg(
         .shell()
         .sidecar("ffmpeg")
         .map_err(|e| format!("Failed to get ffmpeg sidecar: {}", e))?
+        .args([
+            "-y",
+            "-i",
+            wav_str,
+            "-c:a",
+            "libvorbis",
+            "-q:a",
+            "4",
+            "-loglevel",
+            "error",
+            ogg_str,
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run ffmpeg: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "ffmpeg failed (exit {}): {}",
+            output.status.code().unwrap_or(-1),
+            stderr
+        ));
+    }
+
+    if !ogg_path.exists() {
+        return Err(format!("ffmpeg did not create output file: {}", ogg_str));
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// Linux implementation: sidecar for vgmstream, system ffmpeg
+// ============================================================================
+
+#[cfg(target_os = "linux")]
+async fn convert_wav_to_ogg(
+    _app: &AppHandle,
+    wav_path: &Path,
+    ogg_path: &Path,
+) -> Result<(), String> {
+    let wav_str = wav_path
+        .to_str()
+        .ok_or_else(|| "Invalid WAV path".to_string())?;
+    let ogg_str = ogg_path
+        .to_str()
+        .ok_or_else(|| "Invalid OGG path".to_string())?;
+
+    let output = tokio::process::Command::new("ffmpeg")
         .args([
             "-y",
             "-i",

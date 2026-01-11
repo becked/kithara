@@ -39,9 +39,7 @@
 		"resources": [
 			"resources/**/*",
 			"resources-win/vgmstream/*",
-			"resources-win/ffmpeg/*",
-			"resources-linux/vgmstream/*",
-			"resources-linux/ffmpeg/*"
+			"resources-win/ffmpeg/*"
 		],
 		"externalBin": [
 			"binaries/vgmstream-cli",
@@ -53,6 +51,11 @@
 		"windows": {
 			"webviewInstallMode": {
 				"type": "downloadBootstrapper"
+			}
+		},
+		"linux": {
+			"deb": {
+				"depends": ["ffmpeg"]
 			}
 		}
 	},

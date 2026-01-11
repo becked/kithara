@@ -172,32 +172,21 @@ jobs:
 
       - name: Download Linux audio tools
         run: |
-          # Create resource directories
-          mkdir -p src-tauri/resources-linux/vgmstream
-          mkdir -p src-tauri/resources-linux/ffmpeg
-
-          # Download vgmstream
+          # Download vgmstream (ffmpeg comes from apt dependency)
           echo "Downloading vgmstream..."
           wget -q "https://github.com/vgmstream/vgmstream/releases/latest/download/vgmstream-linux-cli.zip" -O vgmstream.zip
-          unzip -q vgmstream.zip -d src-tauri/resources-linux/vgmstream/
-          chmod +x src-tauri/resources-linux/vgmstream/vgmstream-cli
+          unzip -q vgmstream.zip -d vgmstream-extract/
 
-          # Download ffmpeg static build
-          echo "Downloading ffmpeg..."
-          wget -q "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -O ffmpeg.tar.xz
-          tar -xf ffmpeg.tar.xz
-          cp ffmpeg-*-amd64-static/ffmpeg src-tauri/resources-linux/ffmpeg/
-          chmod +x src-tauri/resources-linux/ffmpeg/ffmpeg
+          # Copy vgmstream to binaries folder for Tauri sidecar
+          cp vgmstream-extract/vgmstream-cli src-tauri/binaries/vgmstream-cli-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/vgmstream-cli-x86_64-unknown-linux-gnu
 
-          # Copy to binaries folder for Tauri's externalBin requirement
-          cp src-tauri/resources-linux/vgmstream/vgmstream-cli src-tauri/binaries/vgmstream-cli-x86_64-unknown-linux-gnu
-          cp src-tauri/resources-linux/ffmpeg/ffmpeg src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          # Create placeholder ffmpeg script (satisfies Tauri build, but we use system ffmpeg)
+          echo '#!/bin/sh' > src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          echo 'exec /usr/bin/ffmpeg "$@"' >> src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
 
           # Verify files
-          echo "vgmstream resources:"
-          ls -la src-tauri/resources-linux/vgmstream/
-          echo "ffmpeg resources:"
-          ls -la src-tauri/resources-linux/ffmpeg/
           echo "sidecar binaries:"
           ls -la src-tauri/binaries/
 
