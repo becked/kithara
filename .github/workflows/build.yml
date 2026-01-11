@@ -29,6 +29,13 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Setup macOS resources
+        run: |
+          # Move ffmpeg from binaries to resources for macOS
+          mkdir -p src-tauri/resources-mac/ffmpeg
+          cp src-tauri/binaries/ffmpeg-aarch64-apple-darwin src-tauri/resources-mac/ffmpeg/ffmpeg
+          chmod +x src-tauri/resources-mac/ffmpeg/ffmpeg
+
       - name: Install frontend dependencies
         run: npm ci
 
@@ -180,11 +187,6 @@ jobs:
           # Copy vgmstream to binaries folder for Tauri sidecar
           cp vgmstream-extract/vgmstream-cli src-tauri/binaries/vgmstream-cli-x86_64-unknown-linux-gnu
           chmod +x src-tauri/binaries/vgmstream-cli-x86_64-unknown-linux-gnu
-
-          # Create placeholder ffmpeg script (satisfies Tauri build, but we use system ffmpeg)
-          echo '#!/bin/sh' > src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
-          echo 'exec /usr/bin/ffmpeg "$@"' >> src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
-          chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
 
           # Verify files
           echo "sidecar binaries:"
