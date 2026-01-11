@@ -50,29 +50,18 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
+      - name: Pre-sign ffmpeg for bundling
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          # Sign ffmpeg before Tauri bundles it, so it's included in the properly-built DMG
+          codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" src-tauri/resources-mac/ffmpeg/ffmpeg
+          codesign -dv src-tauri/resources-mac/ffmpeg/ffmpeg
+
       - name: Build Tauri app
         run: npm run tauri build
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-
-      - name: Sign ffmpeg in app bundle
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          APP_PATH="src-tauri/target/release/bundle/macos/Kithara.app"
-          FFMPEG_PATH="$APP_PATH/Contents/Resources/resources-mac/ffmpeg/ffmpeg"
-
-          echo "Signing ffmpeg binary..."
-          codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" "$FFMPEG_PATH"
-
-          echo "Re-signing app bundle..."
-          codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" "$APP_PATH"
-
-          echo "Recreating DMG..."
-          rm -f src-tauri/target/release/bundle/dmg/*.dmg
-          cd src-tauri/target/release/bundle
-          hdiutil create -volname "Kithara" -srcfolder macos -ov -format UDZO dmg/Kithara_0.2.1_aarch64.dmg
-          codesign --force --sign "$APPLE_SIGNING_IDENTITY" dmg/Kithara_0.2.1_aarch64.dmg
 
       - name: Notarize app
         env:
