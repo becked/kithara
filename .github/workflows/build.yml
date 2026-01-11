@@ -29,18 +29,6 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Download static ffmpeg for macOS
-        run: |
-          # Download static ffmpeg build for macOS ARM64
-          mkdir -p src-tauri/resources-mac/ffmpeg
-          echo "Downloading static ffmpeg..."
-          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/7z" -o ffmpeg.7z
-          7z x ffmpeg.7z
-          cp ffmpeg src-tauri/resources-mac/ffmpeg/ffmpeg
-          chmod +x src-tauri/resources-mac/ffmpeg/ffmpeg
-          echo "ffmpeg downloaded:"
-          ls -la src-tauri/resources-mac/ffmpeg/
-
       - name: Install frontend dependencies
         run: npm ci
 
@@ -49,14 +37,6 @@ jobs:
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-      - name: Pre-sign ffmpeg for bundling
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        run: |
-          # Sign ffmpeg before Tauri bundles it, so it's included in the properly-built DMG
-          codesign --force --options runtime --sign "$APPLE_SIGNING_IDENTITY" src-tauri/resources-mac/ffmpeg/ffmpeg
-          codesign -dv src-tauri/resources-mac/ffmpeg/ffmpeg
 
       - name: Build Tauri app
         run: npm run tauri build

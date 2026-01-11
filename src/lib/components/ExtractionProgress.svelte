@@ -4,7 +4,8 @@
 		getExtractionStatus,
 		startExtraction,
 		cancelExtraction,
-		detectGamePath
+		detectGamePath,
+		checkAudioDependencies
 	} from '$lib/api';
 	import type { ExtractionStatus } from '$lib/types';
 
@@ -18,6 +19,7 @@
 	});
 
 	let gamePath = $state<string | null>(null);
+	let missingDeps = $state<string[]>([]);
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Computed state helpers
@@ -26,6 +28,8 @@
 	let isComplete = $derived(status.state === 'complete');
 	let hasError = $derived(status.state === 'error');
 	let progressPercent = $derived(Math.round(status.progress * 100));
+	let hasMissingDeps = $derived(missingDeps.length > 0);
+	let brewCommand = $derived(`brew install ${missingDeps.join(' ')}`);
 
 	async function detectPath() {
 		try {
@@ -89,6 +93,13 @@
 	}
 
 	onMount(async () => {
+		// Check for missing audio dependencies (macOS only)
+		try {
+			missingDeps = await checkAudioDependencies();
+		} catch (e) {
+			console.error('Failed to check dependencies:', e);
+		}
+
 		await detectPath();
 		status = await getExtractionStatus();
 
@@ -111,6 +122,29 @@
 				Extract sound effects from Old World's game files. This process takes 3-4 minutes.
 			</p>
 
+			{#if hasMissingDeps}
+				<div class="missing-deps">
+					<p class="deps-title">Required tools not found</p>
+					<p class="deps-description">
+						Audio extraction requires <strong>{missingDeps.join(' and ')}</strong> to be installed via Homebrew.
+					</p>
+					<div class="brew-command">
+						<code>{brewCommand}</code>
+						<button
+							class="copy-button"
+							onclick={() => navigator.clipboard.writeText(brewCommand)}
+							title="Copy to clipboard"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+								<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+							</svg>
+						</button>
+					</div>
+					<p class="deps-hint">After installing, restart Kithara.</p>
+				</div>
+			{/if}
+
 			{#if gamePath}
 				<div class="game-path">
 					<span class="label">Game found:</span>
@@ -123,7 +157,7 @@
 				</div>
 			{/if}
 
-			<button class="primary-button" onclick={handleStart} disabled={!gamePath}>
+			<button class="primary-button" onclick={handleStart} disabled={!gamePath || hasMissingDeps}>
 				Start Extraction
 			</button>
 		</div>
@@ -305,5 +339,68 @@
 
 	.extraction-complete p {
 		color: var(--color-text-muted);
+	}
+
+	/* Missing dependencies */
+	.missing-deps {
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-primary);
+		border-radius: var(--radius-md);
+		padding: 1.25rem;
+		margin-bottom: 1.5rem;
+		max-width: 450px;
+	}
+
+	.deps-title {
+		color: var(--color-primary);
+		font-weight: 600;
+		margin-bottom: 0.5rem;
+	}
+
+	.deps-description {
+		color: var(--color-text-muted);
+		font-size: 0.9rem;
+		margin-bottom: 1rem;
+	}
+
+	.brew-command {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		background: var(--color-bg);
+		padding: 0.75rem;
+		border-radius: var(--radius-sm);
+		margin-bottom: 0.75rem;
+	}
+
+	.brew-command code {
+		flex: 1;
+		font-family: monospace;
+		font-size: 0.85rem;
+		color: var(--color-text);
+		word-break: break-all;
+	}
+
+	.copy-button {
+		background: transparent;
+		border: none;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		padding: 0.25rem;
+		border-radius: var(--radius-sm);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.copy-button:hover {
+		color: var(--color-text);
+		background: var(--color-bg-secondary);
+	}
+
+	.deps-hint {
+		font-size: 0.8rem;
+		color: var(--color-text-muted);
+		opacity: 0.7;
 	}
 </style>

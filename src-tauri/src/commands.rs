@@ -158,6 +158,13 @@ pub async fn cancel_extraction(
     Ok(())
 }
 
+/// Check if required audio dependencies are installed (macOS only)
+/// Returns a list of missing dependencies (empty if all are available)
+#[tauri::command]
+pub async fn check_audio_dependencies() -> Result<Vec<String>, String> {
+    Ok(crate::extractor::converter::check_audio_dependencies().await)
+}
+
 /// Clear the cache (database records and sounds folder) for rebuilding
 #[tauri::command]
 pub async fn clear_cache(

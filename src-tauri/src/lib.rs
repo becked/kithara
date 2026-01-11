@@ -40,6 +40,7 @@ pub fn run() {
             commands::get_extraction_status,
             commands::start_extraction,
             commands::cancel_extraction,
+            commands::check_audio_dependencies,
             commands::clear_cache,
             commands::detect_game_path,
         ])

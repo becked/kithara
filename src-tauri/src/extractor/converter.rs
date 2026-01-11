@@ -1,16 +1,16 @@
 //! Audio conversion pipeline: WEM -> WAV -> OGG
 //! Uses vgmstream-cli and ffmpeg.
-//! - macOS: Sidecars for both vgmstream-cli and ffmpeg
+//! - macOS: System binaries via Homebrew (brew install vgmstream ffmpeg)
 //! - Linux: Sidecar for vgmstream-cli, system ffmpeg (apt dependency)
 //! - Windows: Bundled resources (exe + DLLs)
 
 use std::path::Path;
 use tauri::AppHandle;
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 use tauri_plugin_shell::ShellExt;
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 use tauri::Manager;
 
 #[cfg(target_os = "windows")]
@@ -41,10 +41,100 @@ pub async fn convert_wem_to_ogg(
 }
 
 // ============================================================================
-// macOS/Linux implementation using sidecars
+// macOS implementation: system binaries via Homebrew
 // ============================================================================
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(target_os = "macos")]
+async fn convert_wem_to_wav(
+    _app: &AppHandle,
+    wem_path: &Path,
+    wav_path: &Path,
+) -> Result<(), String> {
+    let wem_str = wem_path
+        .to_str()
+        .ok_or_else(|| "Invalid WEM path".to_string())?;
+    let wav_str = wav_path
+        .to_str()
+        .ok_or_else(|| "Invalid WAV path".to_string())?;
+
+    let output = tokio::process::Command::new("vgmstream-cli")
+        .args(["-o", wav_str, wem_str])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run vgmstream-cli. Please install it with: brew install vgmstream\nError: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!(
+            "vgmstream-cli failed (exit {}): {} {}",
+            output.status.code().unwrap_or(-1),
+            stderr,
+            stdout
+        ));
+    }
+
+    if !wav_path.exists() {
+        return Err(format!(
+            "vgmstream-cli did not create output file: {}",
+            wav_str
+        ));
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+async fn convert_wav_to_ogg(
+    _app: &AppHandle,
+    wav_path: &Path,
+    ogg_path: &Path,
+) -> Result<(), String> {
+    let wav_str = wav_path
+        .to_str()
+        .ok_or_else(|| "Invalid WAV path".to_string())?;
+    let ogg_str = ogg_path
+        .to_str()
+        .ok_or_else(|| "Invalid OGG path".to_string())?;
+
+    let output = tokio::process::Command::new("ffmpeg")
+        .args([
+            "-y",
+            "-i",
+            wav_str,
+            "-c:a",
+            "libvorbis",
+            "-q:a",
+            "4",
+            "-loglevel",
+            "error",
+            ogg_str,
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run ffmpeg. Please install it with: brew install ffmpeg\nError: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "ffmpeg failed (exit {}): {}",
+            output.status.code().unwrap_or(-1),
+            stderr
+        ));
+    }
+
+    if !ogg_path.exists() {
+        return Err(format!("ffmpeg did not create output file: {}", ogg_str));
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// Linux implementation: sidecar for vgmstream, system ffmpeg
+// ============================================================================
+
+#[cfg(target_os = "linux")]
 async fn convert_wem_to_wav(
     app: &AppHandle,
     wem_path: &Path,
@@ -86,73 +176,6 @@ async fn convert_wem_to_wav(
 
     Ok(())
 }
-
-#[cfg(target_os = "macos")]
-async fn convert_wav_to_ogg(
-    app: &AppHandle,
-    wav_path: &Path,
-    ogg_path: &Path,
-) -> Result<(), String> {
-    let resource_dir = app
-        .path()
-        .resource_dir()
-        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
-
-    let ffmpeg_bin = resource_dir
-        .join("resources-mac")
-        .join("ffmpeg")
-        .join("ffmpeg");
-
-    if !ffmpeg_bin.exists() {
-        return Err(format!(
-            "ffmpeg not found at: {}",
-            ffmpeg_bin.display()
-        ));
-    }
-
-    let wav_str = wav_path
-        .to_str()
-        .ok_or_else(|| "Invalid WAV path".to_string())?;
-    let ogg_str = ogg_path
-        .to_str()
-        .ok_or_else(|| "Invalid OGG path".to_string())?;
-
-    let output = tokio::process::Command::new(&ffmpeg_bin)
-        .args([
-            "-y",
-            "-i",
-            wav_str,
-            "-c:a",
-            "libvorbis",
-            "-q:a",
-            "4",
-            "-loglevel",
-            "error",
-            ogg_str,
-        ])
-        .output()
-        .await
-        .map_err(|e| format!("Failed to run ffmpeg: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!(
-            "ffmpeg failed (exit {}): {}",
-            output.status.code().unwrap_or(-1),
-            stderr
-        ));
-    }
-
-    if !ogg_path.exists() {
-        return Err(format!("ffmpeg did not create output file: {}", ogg_str));
-    }
-
-    Ok(())
-}
-
-// ============================================================================
-// Linux implementation: sidecar for vgmstream, system ffmpeg
-// ============================================================================
 
 #[cfg(target_os = "linux")]
 async fn convert_wav_to_ogg(
@@ -324,4 +347,45 @@ async fn convert_wav_to_ogg(
     }
 
     Ok(())
+}
+
+// ============================================================================
+// Dependency checking (macOS only - other platforms bundle dependencies)
+// ============================================================================
+
+/// Check if required audio tools are available.
+/// Returns a list of missing dependencies (empty if all are available).
+#[cfg(target_os = "macos")]
+pub async fn check_audio_dependencies() -> Vec<String> {
+    let mut missing = Vec::new();
+
+    // Check vgmstream-cli
+    if tokio::process::Command::new("which")
+        .arg("vgmstream-cli")
+        .output()
+        .await
+        .map(|o| !o.status.success())
+        .unwrap_or(true)
+    {
+        missing.push("vgmstream".to_string());
+    }
+
+    // Check ffmpeg
+    if tokio::process::Command::new("which")
+        .arg("ffmpeg")
+        .output()
+        .await
+        .map(|o| !o.status.success())
+        .unwrap_or(true)
+    {
+        missing.push("ffmpeg".to_string());
+    }
+
+    missing
+}
+
+/// Non-macOS platforms bundle dependencies, so always return empty.
+#[cfg(not(target_os = "macos"))]
+pub async fn check_audio_dependencies() -> Vec<String> {
+    Vec::new()
 }

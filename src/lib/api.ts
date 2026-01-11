@@ -64,3 +64,7 @@ export async function clearCache(): Promise<void> {
 export async function detectGamePath(): Promise<string | null> {
 	return invoke('detect_game_path');
 }
+
+export async function checkAudioDependencies(): Promise<string[]> {
+	return invoke('check_audio_dependencies');
+}
