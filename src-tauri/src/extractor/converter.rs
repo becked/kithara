@@ -6,7 +6,7 @@
 use std::path::Path;
 use tauri::AppHandle;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use tauri_plugin_shell::ShellExt;
 
 #[cfg(target_os = "windows")]
@@ -40,10 +40,10 @@ pub async fn convert_wem_to_ogg(
 }
 
 // ============================================================================
-// macOS implementation using sidecars
+// macOS/Linux implementation using sidecars
 // ============================================================================
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 async fn convert_wem_to_wav(
     app: &AppHandle,
     wem_path: &Path,
@@ -86,7 +86,7 @@ async fn convert_wem_to_wav(
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 async fn convert_wav_to_ogg(
     app: &AppHandle,
     wav_path: &Path,
