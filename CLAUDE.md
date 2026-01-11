@@ -243,7 +243,9 @@ const sounds = await invoke('search_sounds', { query });
 - Windows: `%APPDATA%\kithara\`
 - Linux: `~/.local/share/kithara/`
 
-## Commit Messages
+## Git Workflow
+
+**NEVER commit or push changes automatically.** Only commit/push when explicitly asked by the user. This allows the user to validate changes before committing.
 
 Do NOT include these lines in commit messages:
 - `🤖 Generated with [Claude Code](https://claude.com/claude-code)`
