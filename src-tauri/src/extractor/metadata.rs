@@ -25,6 +25,74 @@ pub struct WwiseFileInfo {
     pub path: String,       // WEM file path
 }
 
+/// Parsed streamed file info from SoundbanksInfo.xml
+#[derive(Debug, Clone)]
+pub struct StreamedFileInfo {
+    pub id: u32,
+    pub short_name: String,
+}
+
+/// Parse SoundbanksInfo.xml to get streamed music file mappings
+pub fn parse_soundbanks_info_xml(path: &Path) -> Result<HashMap<u32, StreamedFileInfo>, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read SoundbanksInfo.xml: {}", e))?;
+
+    let mut reader = Reader::from_str(&content);
+    reader.config_mut().trim_text(true);
+
+    let mut files = HashMap::new();
+    let mut buf = Vec::new();
+    let mut in_streamed_files = false;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(XmlEvent::Start(e)) if e.name().as_ref() == b"StreamedFiles" => {
+                in_streamed_files = true;
+            }
+            Ok(XmlEvent::End(e)) if e.name().as_ref() == b"StreamedFiles" => {
+                in_streamed_files = false;
+            }
+            Ok(XmlEvent::Start(e)) if in_streamed_files && e.name().as_ref() == b"File" => {
+                let mut file_info = StreamedFileInfo {
+                    id: 0,
+                    short_name: String::new(),
+                };
+
+                for attr in e.attributes().flatten() {
+                    if attr.key.as_ref() == b"Id" {
+                        file_info.id = parse_attr_u32(&attr.value);
+                    }
+                }
+
+                // Parse child elements for ShortName
+                loop {
+                    match reader.read_event_into(&mut buf) {
+                        Ok(XmlEvent::Start(child)) if child.name().as_ref() == b"ShortName" => {
+                            if let Ok(XmlEvent::Text(text)) = reader.read_event_into(&mut buf) {
+                                file_info.short_name = String::from_utf8_lossy(&text).to_string();
+                            }
+                        }
+                        Ok(XmlEvent::End(end)) if end.name().as_ref() == b"File" => break,
+                        Ok(XmlEvent::Eof) => break,
+                        Err(_) => break,
+                        _ => {}
+                    }
+                }
+
+                if file_info.id > 0 && !file_info.short_name.is_empty() {
+                    files.insert(file_info.id, file_info);
+                }
+            }
+            Ok(XmlEvent::Eof) => break,
+            Err(e) => return Err(format!("XML parse error: {}", e)),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    Ok(files)
+}
+
 /// Parse soundbank XML (Audio_Animation.xml, etc.) to get WEM file ID -> metadata mapping
 pub fn parse_soundbank_xml(path: &Path) -> Result<HashMap<u32, WwiseFileInfo>, String> {
     let content = std::fs::read_to_string(path)
@@ -419,6 +487,97 @@ pub fn format_short_name_display(short_name: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Format a music track title from soundbank short_name
+/// Converts "mus.theme.title.MSTR.wav" to "Theme Title"
+pub fn format_music_title(short_name: &str) -> String {
+    // Remove file extension
+    let name = short_name.trim_end_matches(".wav").trim_end_matches(".WAV");
+
+    // Noise words to filter out
+    let noise_words = ["mus", "bgm", "music", "mstr", "sfx", "a", "b", "c", "loop", "lp"];
+
+    // Split by dots and underscores
+    let parts: Vec<&str> = name
+        .split(|c| c == '.' || c == '_')
+        .filter(|p| {
+            !p.is_empty()
+                && !p.chars().all(|c| c.is_ascii_digit())
+                && p.len() > 1
+                && !noise_words.contains(&p.to_lowercase().as_str())
+        })
+        .collect();
+
+    if parts.is_empty() {
+        return short_name.to_string();
+    }
+
+    // Capitalize each word
+    parts
+        .iter()
+        .map(|p| {
+            let mut chars = p.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => first.to_uppercase().chain(chars).collect(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Format a streamed music file title
+/// Handles formats like:
+/// - "Shope, Shope.wav"
+/// - "44-16 WAVs\06_Christopher Tin_Zealot King (Assyria)_44-16_082321.wav"
+/// - "Violin Concerto - II - Philip Glass.wav"
+pub fn format_streamed_music_title(short_name: &str) -> String {
+    // Remove file extension and path prefix
+    let name = short_name
+        .trim_end_matches(".wav")
+        .trim_end_matches(".WAV");
+
+    // Get just the filename if there's a path
+    let name = name.rsplit(['\\', '/']).next().unwrap_or(name);
+
+    // Handle "XX_Artist_Title_XX_XXXXXX" format (Christopher Tin tracks)
+    if name.contains("Christopher Tin") || name.contains("_44-16_") {
+        // Format: "06_Christopher Tin_Zealot King (Assyria)_44-16_082321"
+        let parts: Vec<&str> = name.split('_').collect();
+        if parts.len() >= 3 {
+            // Skip track number, get artist and title
+            let artist_title: Vec<&str> = parts.iter()
+                .skip(1) // Skip track number
+                .take_while(|p| !p.contains("44-16") && !p.chars().all(|c| c.is_ascii_digit()))
+                .cloned()
+                .collect();
+
+            if !artist_title.is_empty() {
+                return artist_title.join(" - ");
+            }
+        }
+    }
+
+    // Handle suffix patterns like "_C49E5CC0"
+    let name = if let Some(idx) = name.rfind("_C49E5CC0") {
+        &name[..idx]
+    } else {
+        name
+    };
+
+    // Clean up other noise patterns
+    let clean = name
+        .replace(".MSTR", "")
+        .replace("_MSTR", "")
+        .trim()
+        .to_string();
+
+    if clean.is_empty() {
+        short_name.to_string()
+    } else {
+        clean
+    }
 }
 
 #[cfg(test)]

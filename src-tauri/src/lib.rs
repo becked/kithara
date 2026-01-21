@@ -36,6 +36,10 @@ pub fn run() {
             commands::get_favorites,
             commands::play_sound,
             commands::stop_sound,
+            commands::pause_sound,
+            commands::resume_sound,
+            commands::seek_sound,
+            commands::set_volume,
             commands::get_playback_status,
             commands::get_extraction_status,
             commands::start_extraction,
@@ -43,6 +47,9 @@ pub fn run() {
             commands::check_audio_dependencies,
             commands::clear_cache,
             commands::detect_game_path,
+            commands::get_music_tracks,
+            commands::search_music_tracks,
+            commands::get_music_tracks_count,
         ])
         .setup(|app| {
             let catalog = app.state::<Catalog>();

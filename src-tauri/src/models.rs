@@ -77,7 +77,33 @@ impl Default for ExtractionStatus {
 #[serde(rename_all = "camelCase")]
 pub struct PlaybackStatus {
     pub is_playing: bool,
+    pub is_paused: bool,
     pub current_sound_id: Option<String>,
+    pub position_secs: f64,
+    pub duration_secs: f64,
+    pub volume: f32,
+    pub sample_rate: u32,
+    pub bitrate_kbps: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/lib/types/"))]
+#[serde(rename_all = "camelCase")]
+pub struct MusicTrack {
+    pub id: String,
+    pub title: String,
+    pub file_path: String,
+    pub duration_secs: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(test, derive(TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/lib/types/"))]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractionOptions {
+    pub include_sounds: bool,
+    pub include_music: bool,
 }
 
 #[cfg(test)]
@@ -92,5 +118,7 @@ mod tests {
         ExtractionState::export_all().expect("Failed to export ExtractionState");
         ExtractionStatus::export_all().expect("Failed to export ExtractionStatus");
         PlaybackStatus::export_all().expect("Failed to export PlaybackStatus");
+        MusicTrack::export_all().expect("Failed to export MusicTrack");
+        ExtractionOptions::export_all().expect("Failed to export ExtractionOptions");
     }
 }

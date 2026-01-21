@@ -1,10 +1,12 @@
 # Kithara
 
-![Kithara](kithara.jpg)
-
-A cross-platform soundboard application for Old World game audio.
+A cross-platform soundboard and music player for Old World game audio.
 
 Built with [Tauri 2](https://tauri.app/), [Svelte 5](https://svelte.dev/), and Rust.
+
+![Soundboard](soundboard.png)
+
+![Music Player](winamp.png)
 
 ## Prerequisites
 

@@ -384,3 +384,100 @@ pub async fn check_audio_dependencies() -> Vec<String> {
 pub async fn check_audio_dependencies() -> Vec<String> {
     Vec::new()
 }
+
+// ============================================================================
+// Duration detection using ffprobe
+// ============================================================================
+
+#[cfg(target_os = "macos")]
+const HOMEBREW_FFPROBE: &str = "/opt/homebrew/bin/ffprobe";
+
+/// Get the duration of an audio file in seconds using ffprobe
+#[cfg(target_os = "macos")]
+pub async fn get_audio_duration(audio_path: &Path) -> Result<f64, String> {
+    let path_str = audio_path
+        .to_str()
+        .ok_or_else(|| "Invalid audio path".to_string())?;
+
+    let output = tokio::process::Command::new(HOMEBREW_FFPROBE)
+        .args([
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path_str,
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run ffprobe: {}", e))?;
+
+    if !output.status.success() {
+        return Err("ffprobe failed to get duration".to_string());
+    }
+
+    let duration_str = String::from_utf8_lossy(&output.stdout);
+    duration_str
+        .trim()
+        .parse::<f64>()
+        .map_err(|e| format!("Failed to parse duration: {}", e))
+}
+
+/// Get the duration of an audio file in seconds using ffprobe (Linux)
+#[cfg(target_os = "linux")]
+pub async fn get_audio_duration(audio_path: &Path) -> Result<f64, String> {
+    let path_str = audio_path
+        .to_str()
+        .ok_or_else(|| "Invalid audio path".to_string())?;
+
+    let output = tokio::process::Command::new("ffprobe")
+        .args([
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path_str,
+        ])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run ffprobe: {}", e))?;
+
+    if !output.status.success() {
+        return Err("ffprobe failed to get duration".to_string());
+    }
+
+    let duration_str = String::from_utf8_lossy(&output.stdout);
+    duration_str
+        .trim()
+        .parse::<f64>()
+        .map_err(|e| format!("Failed to parse duration: {}", e))
+}
+
+/// Get the duration of an audio file in seconds using ffprobe (Windows)
+#[cfg(target_os = "windows")]
+pub async fn get_audio_duration(audio_path: &Path) -> Result<f64, String> {
+    // On Windows, ffprobe should be bundled alongside ffmpeg
+    let path_str = audio_path
+        .to_str()
+        .ok_or_else(|| "Invalid audio path".to_string())?;
+
+    // Try system ffprobe first
+    let output = tokio::process::Command::new("ffprobe")
+        .args([
+            "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            path_str,
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run ffprobe: {}", e))?;
+
+    if !output.status.success() {
+        return Err("ffprobe failed to get duration".to_string());
+    }
+
+    let duration_str = String::from_utf8_lossy(&output.stdout);
+    duration_str
+        .trim()
+        .parse::<f64>()
+        .map_err(|e| format!("Failed to parse duration: {}", e))
+}

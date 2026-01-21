@@ -2,7 +2,7 @@
 //!
 //! Uses rusqlite with FTS5 for full-text search capabilities.
 
-use crate::models::{Category, Sound, UnitType};
+use crate::models::{Category, MusicTrack, Sound, UnitType};
 use rusqlite::{params, Connection};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -77,6 +77,16 @@ impl Catalog {
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS music_tracks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                duration_secs REAL DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_music_tracks_title ON music_tracks(title);
         "#,
         )
         .map_err(|e| format!("Failed to create schema: {}", e))?;
@@ -452,6 +462,97 @@ impl Catalog {
             .map_err(|e| format!("Failed to delete sounds: {}", e))?;
 
         Ok(file_paths)
+    }
+
+    // ========== Music Track Methods ==========
+
+    /// Inserts a music track into the catalog.
+    pub fn insert_music_track(&self, track: &MusicTrack) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        conn.execute(
+            "INSERT OR REPLACE INTO music_tracks (id, title, file_path, duration_secs)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![track.id, track.title, track.file_path, track.duration_secs],
+        )
+        .map_err(|e| format!("Failed to insert music track: {}", e))?;
+
+        Ok(())
+    }
+
+    /// Returns all music tracks, ordered by title.
+    pub fn get_music_tracks(&self) -> Result<Vec<MusicTrack>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, title, file_path, duration_secs
+                 FROM music_tracks
+                 ORDER BY title ASC",
+            )
+            .map_err(|e| format!("Failed to prepare: {}", e))?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(MusicTrack {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    file_path: row.get(2)?,
+                    duration_secs: row.get(3)?,
+                })
+            })
+            .map_err(|e| format!("Query failed: {}", e))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect: {}", e))
+    }
+
+    /// Searches music tracks by title.
+    pub fn search_music_tracks(&self, query: &str) -> Result<Vec<MusicTrack>, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+
+        let search_pattern = format!("%{}%", query.to_lowercase());
+
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, title, file_path, duration_secs
+                 FROM music_tracks
+                 WHERE LOWER(title) LIKE ?1
+                 ORDER BY title ASC
+                 LIMIT 100",
+            )
+            .map_err(|e| format!("Failed to prepare: {}", e))?;
+
+        let rows = stmt
+            .query_map(params![search_pattern], |row| {
+                Ok(MusicTrack {
+                    id: row.get(0)?,
+                    title: row.get(1)?,
+                    file_path: row.get(2)?,
+                    duration_secs: row.get(3)?,
+                })
+            })
+            .map_err(|e| format!("Query failed: {}", e))?;
+
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Failed to collect: {}", e))
+    }
+
+    /// Returns count of music tracks.
+    pub fn count_music_tracks(&self) -> Result<u64, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let count: u64 = conn
+            .query_row("SELECT COUNT(*) FROM music_tracks", [], |row| row.get(0))
+            .map_err(|e| format!("Failed to count: {}", e))?;
+        Ok(count)
+    }
+
+    /// Clears all music tracks from the catalog.
+    pub fn clear_music_tracks(&self) -> Result<(), String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM music_tracks", [])
+            .map_err(|e| format!("Failed to clear music tracks: {}", e))?;
+        Ok(())
     }
 }
 

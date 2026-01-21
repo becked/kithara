@@ -20,6 +20,7 @@
 
 	let gamePath = $state<string | null>(null);
 	let missingDeps = $state<string[]>([]);
+	let includeMusic = $state(false);
 	let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Computed state helpers
@@ -45,7 +46,7 @@
 		}
 
 		try {
-			await startExtraction(gamePath);
+			await startExtraction(gamePath, includeMusic);
 			startPolling();
 		} catch (e) {
 			console.error('Failed to start extraction:', e);
@@ -156,6 +157,16 @@
 					<p class="hint">Make sure Old World is installed via Steam.</p>
 				</div>
 			{/if}
+
+			<div class="extraction-options">
+				<label class="checkbox-label">
+					<input type="checkbox" bind:checked={includeMusic} />
+					<span class="checkbox-text">
+						Include game music
+						<span class="checkbox-hint">(~795MB extra, enables Music Player)</span>
+					</span>
+				</label>
+			</div>
 
 			<button class="primary-button" onclick={handleStart} disabled={!gamePath || hasMissingDeps}>
 				Start Extraction
@@ -402,5 +413,38 @@
 		font-size: 0.8rem;
 		color: var(--color-text-muted);
 		opacity: 0.7;
+	}
+
+	/* Extraction options */
+	.extraction-options {
+		margin-bottom: 1.5rem;
+	}
+
+	.checkbox-label {
+		display: flex;
+		align-items: flex-start;
+		gap: 0.5rem;
+		cursor: pointer;
+		text-align: left;
+	}
+
+	.checkbox-label input[type='checkbox'] {
+		width: 18px;
+		height: 18px;
+		margin-top: 2px;
+		accent-color: var(--color-primary);
+		cursor: pointer;
+	}
+
+	.checkbox-text {
+		color: var(--color-text);
+		font-size: 0.95rem;
+	}
+
+	.checkbox-hint {
+		display: block;
+		color: var(--color-text-muted);
+		font-size: 0.8rem;
+		margin-top: 0.25rem;
 	}
 </style>

@@ -1,6 +1,6 @@
 use crate::catalog::Catalog;
 use crate::extractor::{self, ExtractionManager};
-use crate::models::{Category, ExtractionState, ExtractionStatus, PlaybackStatus, Sound, UnitType};
+use crate::models::{Category, ExtractionState, ExtractionStatus, MusicTrack, PlaybackStatus, Sound, UnitType};
 use crate::player::PlayerState;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -73,6 +73,30 @@ pub async fn stop_sound(player: State<'_, PlayerState>) -> Result<(), String> {
     player.stop()
 }
 
+/// Pause the currently playing sound
+#[tauri::command]
+pub async fn pause_sound(player: State<'_, PlayerState>) -> Result<(), String> {
+    player.pause()
+}
+
+/// Resume playback after pause
+#[tauri::command]
+pub async fn resume_sound(player: State<'_, PlayerState>) -> Result<(), String> {
+    player.resume()
+}
+
+/// Seek to a position in seconds
+#[tauri::command]
+pub async fn seek_sound(position_secs: f64, player: State<'_, PlayerState>) -> Result<(), String> {
+    player.seek(position_secs)
+}
+
+/// Set the playback volume (0.0 to 1.0)
+#[tauri::command]
+pub async fn set_volume(volume: f32, player: State<'_, PlayerState>) -> Result<(), String> {
+    player.set_volume(volume)
+}
+
 /// Get the current playback status
 #[tauri::command]
 pub async fn get_playback_status(player: State<'_, PlayerState>) -> Result<PlaybackStatus, String> {
@@ -80,7 +104,13 @@ pub async fn get_playback_status(player: State<'_, PlayerState>) -> Result<Playb
 
     Ok(PlaybackStatus {
         is_playing: status.is_playing,
+        is_paused: status.is_paused,
         current_sound_id: status.current_sound_id,
+        position_secs: status.position_secs,
+        duration_secs: status.duration_secs,
+        volume: status.volume,
+        sample_rate: status.sample_rate,
+        bitrate_kbps: status.bitrate_kbps,
     })
 }
 
@@ -97,6 +127,7 @@ pub async fn get_extraction_status(
 pub async fn start_extraction(
     app: AppHandle,
     game_path: String,
+    include_music: bool,
     manager: State<'_, Arc<ExtractionManager>>,
     _catalog: State<'_, Catalog>,
 ) -> Result<(), String> {
@@ -139,6 +170,7 @@ pub async fn start_extraction(
             game_path,
             manager_clone.clone(),
             catalog_for_task,
+            include_music,
         )
         .await
         {
@@ -258,4 +290,31 @@ mod dirs {
     pub fn home_dir() -> Option<PathBuf> {
         directories::BaseDirs::new().map(|dirs| dirs.home_dir().to_path_buf())
     }
+}
+
+// ========== Music Track Commands ==========
+
+/// Get all music tracks
+#[tauri::command]
+pub async fn get_music_tracks(catalog: State<'_, Catalog>) -> Result<Vec<MusicTrack>, String> {
+    catalog.get_music_tracks()
+}
+
+/// Search music tracks by title
+#[tauri::command]
+pub async fn search_music_tracks(
+    query: String,
+    catalog: State<'_, Catalog>,
+) -> Result<Vec<MusicTrack>, String> {
+    if query.trim().is_empty() {
+        catalog.get_music_tracks()
+    } else {
+        catalog.search_music_tracks(&query)
+    }
+}
+
+/// Get count of music tracks
+#[tauri::command]
+pub async fn get_music_tracks_count(catalog: State<'_, Catalog>) -> Result<u64, String> {
+    catalog.count_music_tracks()
 }

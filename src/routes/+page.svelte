@@ -1,12 +1,18 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import SoundGrid from '$lib/components/SoundGrid.svelte';
 	import NowPlaying from '$lib/components/NowPlaying.svelte';
 	import Search from '$lib/components/Search.svelte';
 	import CategorySidebar from '$lib/components/CategorySidebar.svelte';
 	import ExtractionProgress from '$lib/components/ExtractionProgress.svelte';
 	import { soundsState, filterState, initializeSounds, fetchSounds } from '$lib/stores/sounds.svelte';
-	import { getExtractionStatus, clearCache } from '$lib/api';
+	import { getExtractionStatus, clearCache, setWindowForMusicPlayer } from '$lib/api';
+
+	async function goToMusicPlayer() {
+		await setWindowForMusicPlayer();
+		goto('/music');
+	}
 
 	let tauriAvailable = $state(false);
 	let initialized = $state(false);
@@ -102,7 +108,16 @@
 							<p class="subtitle">Old World Soundboard</p>
 						</div>
 					</div>
-					<button class="rebuild-button" onclick={handleRebuildCache} title="Rebuild Cache">
+					<div class="header-actions">
+						<button class="nav-link" onclick={goToMusicPlayer} title="Music Player">
+							<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<path d="M9 18V5l12-2v13"/>
+								<circle cx="6" cy="18" r="3"/>
+								<circle cx="18" cy="16" r="3"/>
+							</svg>
+							<span>Music</span>
+						</button>
+						<button class="rebuild-button" onclick={handleRebuildCache} title="Rebuild Cache">
 						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 							<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
 							<path d="M3 3v5h5"/>
@@ -111,6 +126,7 @@
 						</svg>
 						Rebuild
 					</button>
+					</div>
 				</div>
 				{#if tauriAvailable}
 					<div class="header-controls">
@@ -203,6 +219,34 @@
 	.subtitle {
 		font-size: 0.9rem;
 		color: var(--color-text-muted);
+	}
+
+	.header-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.nav-link {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.75rem;
+		background: transparent;
+		color: var(--color-text-muted);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		font-size: 0.85rem;
+		text-decoration: none;
+		cursor: pointer;
+		font-family: inherit;
+		transition: all 0.2s;
+	}
+
+	.nav-link:hover {
+		color: var(--color-primary);
+		border-color: var(--color-primary);
+		background: rgba(233, 69, 96, 0.1);
 	}
 
 	.rebuild-button {
