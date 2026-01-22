@@ -21,6 +21,24 @@
 	let bitrateKbps = $state(0);
 
 	let statusPollInterval: ReturnType<typeof setInterval> | null = null;
+	let wasPlaying = false; // Track previous state to detect transitions
+
+	// Auto-advance to next track when current track finishes
+	$effect(() => {
+		// Track reactive dependencies unconditionally (Svelte 5 requirement)
+		const playing = isPlaying;
+		const paused = isPaused;
+		const polling = statusPollInterval;
+
+		// Detect transition from playing to stopped (not paused)
+		// Only advance if we were previously playing and now we're not
+		if (wasPlaying && !playing && !paused && polling) {
+			wasPlaying = false;
+			handleNext();
+		} else if (playing) {
+			wasPlaying = true;
+		}
+	});
 
 	async function goToSoundboard() {
 		await setWindowForSoundboard();
