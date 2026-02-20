@@ -102,7 +102,7 @@
 			<header>
 				<div class="header-top">
 					<div class="branding">
-						<img src="/kithara-transparent.png" alt="Kithara" class="app-icon" />
+						<img src="/kithara-logo.jpeg" alt="Kithara" class="app-icon" />
 						<div class="title-area">
 							<h1>Kithara</h1>
 							<p class="subtitle">Old World Soundboard</p>

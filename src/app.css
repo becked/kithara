@@ -1,12 +1,12 @@
 :root {
-	--color-bg: #1a1a2e;
-	--color-bg-secondary: #16213e;
-	--color-bg-tertiary: #0f3460;
-	--color-primary: #e94560;
-	--color-primary-hover: #ff6b6b;
-	--color-text: #eaeaea;
-	--color-text-muted: #a0a0a0;
-	--color-border: #2a2a4a;
+	--color-bg: #1a1610;
+	--color-bg-secondary: #231d14;
+	--color-bg-tertiary: #3d2e1e;
+	--color-primary: #c9935a;
+	--color-primary-hover: #ddb07a;
+	--color-text: #ede4d8;
+	--color-text-muted: #9a8b78;
+	--color-border: #3a2f22;
 	--radius-sm: 4px;
 	--radius-md: 8px;
 	--radius-lg: 12px;
