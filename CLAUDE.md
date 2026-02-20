@@ -253,4 +253,4 @@ Do NOT include these lines in commit messages:
 
 ## Current Status
 
-The project has detailed architecture documentation but implementation is early stage. Most Rust commands in commands.rs are stubs. The extraction pipeline (BNK parsing, .wem extraction, vgmstream conversion) is documented but not yet implemented.
+The core app is functional: extraction pipeline (BNK parsing, .wem extraction, vgmstream conversion), sound playback, music player, and catalog/search are all implemented. The frontend has working soundboard and music player views.

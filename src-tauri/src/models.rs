@@ -97,15 +97,6 @@ pub struct MusicTrack {
     pub duration_secs: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(test, derive(TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/lib/types/"))]
-#[serde(rename_all = "camelCase")]
-pub struct ExtractionOptions {
-    pub include_sounds: bool,
-    pub include_music: bool,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,6 +110,5 @@ mod tests {
         ExtractionStatus::export_all().expect("Failed to export ExtractionStatus");
         PlaybackStatus::export_all().expect("Failed to export PlaybackStatus");
         MusicTrack::export_all().expect("Failed to export MusicTrack");
-        ExtractionOptions::export_all().expect("Failed to export ExtractionOptions");
     }
 }

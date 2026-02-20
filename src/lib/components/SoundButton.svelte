@@ -17,12 +17,6 @@
 		await toggleFavoriteAction(sound.id);
 	}
 
-	function formatDuration(seconds: number): string {
-		const secs = Math.floor(seconds);
-		return secs < 60
-			? `${secs}s`
-			: `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
-	}
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -57,7 +51,6 @@
 			</svg>
 		</button>
 	</div>
-	<span class="duration">{formatDuration(sound.duration)}</span>
 	{#if sound.unitType}
 		<span class="unit-type">{sound.unitType}</span>
 	{/if}
@@ -141,11 +134,6 @@
 		color: white;
 	}
 
-	.duration {
-		font-size: 0.75rem;
-		color: var(--color-text-muted);
-	}
-
 	.unit-type {
 		font-size: 0.7rem;
 		color: var(--color-text-muted);
@@ -154,7 +142,6 @@
 		border-radius: var(--radius-sm);
 	}
 
-	.sound-button.playing .duration,
 	.sound-button.playing .unit-type {
 		color: rgba(255, 255, 255, 0.8);
 	}

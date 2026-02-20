@@ -7,12 +7,6 @@
 		await stopSoundAction();
 	}
 
-	function formatDuration(seconds: number): string {
-		const secs = Math.floor(seconds);
-		return secs < 60
-			? `${secs}s`
-			: `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
-	}
 </script>
 
 {#if isVisible}
@@ -20,7 +14,6 @@
 		<div class="info">
 			<span class="label">Now Playing</span>
 			<span class="name">{playerState.currentSound?.displayName}</span>
-			<span class="duration">{formatDuration(playerState.currentSound?.duration ?? 0)}</span>
 		</div>
 		<button class="stop-button" onclick={handleStop} disabled={!playerState.isPlaying}>
 			Stop
@@ -60,11 +53,6 @@
 	.name {
 		font-weight: 500;
 		color: var(--color-primary);
-	}
-
-	.duration {
-		font-size: 0.85rem;
-		color: var(--color-text-muted);
 	}
 
 	.stop-button {

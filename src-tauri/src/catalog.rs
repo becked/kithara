@@ -547,13 +547,6 @@ impl Catalog {
         Ok(count)
     }
 
-    /// Clears all music tracks from the catalog.
-    pub fn clear_music_tracks(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        conn.execute("DELETE FROM music_tracks", [])
-            .map_err(|e| format!("Failed to clear music tracks: {}", e))?;
-        Ok(())
-    }
 }
 
 /// Helper function to convert a row to a Sound struct

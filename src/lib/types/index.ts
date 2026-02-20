@@ -2,7 +2,6 @@
 // Run `npm run types:generate` to regenerate from Rust models
 
 export type { Category } from './Category';
-export type { ExtractionOptions } from './ExtractionOptions';
 export type { ExtractionState } from './ExtractionState';
 export type { ExtractionStatus } from './ExtractionStatus';
 export type { MusicTrack } from './MusicTrack';

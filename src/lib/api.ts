@@ -1,9 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
-import type { Sound, Category, UnitType, ExtractionStatus, PlaybackStatus, MusicTrack, ExtractionOptions } from './types';
+import type { Sound, Category, UnitType, ExtractionStatus, PlaybackStatus, MusicTrack } from './types';
 
 // Re-export types for convenience
-export type { Sound, Category, UnitType, ExtractionStatus, PlaybackStatus, MusicTrack, ExtractionOptions };
+export type { Sound, Category, UnitType, ExtractionStatus, PlaybackStatus, MusicTrack };
 export type { ExtractionState } from './types';
 
 export async function searchSounds(
