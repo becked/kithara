@@ -126,8 +126,7 @@ impl Catalog {
     /// Runs once, tracked via metadata table.
     fn migrate_remove_excluded_sounds(&self) -> Result<(), String> {
         const MIGRATION_KEY: &str = "migration_removed_excluded_sounds_v1";
-        const EXCLUSION_PATTERNS: &[&str] =
-            &["jungle", "huns", "yuezhi", "india", "migration", "monkey"];
+        const EXCLUSION_PATTERNS: &[&str] = &[];
 
         // Check if migration already ran
         if self.get_metadata(MIGRATION_KEY)?.is_some() {

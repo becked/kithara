@@ -3,7 +3,7 @@
 
 use quick_xml::events::Event as XmlEvent;
 use quick_xml::Reader;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 /// Parsed WEM file info from soundbank XML IncludedMemoryFiles
@@ -80,6 +80,92 @@ pub fn parse_soundbanks_info_xml(path: &Path) -> Result<HashMap<u32, StreamedFil
     }
 
     Ok(files)
+}
+
+/// Discover soundbank pairs by scanning for Audio_*.xml files containing IncludedMemoryFiles.
+/// Returns Vec of (xml_filename, bnk_filename) pairs.
+pub fn discover_soundbanks(game_dir: &Path) -> Result<Vec<(String, String)>, String> {
+    let mut pairs = Vec::new();
+
+    let entries = std::fs::read_dir(game_dir)
+        .map_err(|e| format!("Failed to read game directory: {}", e))?;
+
+    for entry in entries.flatten() {
+        let file_name = entry.file_name().to_string_lossy().to_string();
+
+        if !file_name.starts_with("Audio_") || !file_name.ends_with(".xml") {
+            continue;
+        }
+
+        let bnk_name = file_name.replace(".xml", ".bnk");
+        if !game_dir.join(&bnk_name).exists() {
+            continue;
+        }
+
+        let xml_path = game_dir.join(&file_name);
+        let content = std::fs::read_to_string(&xml_path)
+            .map_err(|e| format!("Failed to read {}: {}", file_name, e))?;
+
+        if content.contains("IncludedMemoryFiles") {
+            pairs.push((file_name, bnk_name));
+        }
+    }
+
+    pairs.sort();
+    Ok(pairs)
+}
+
+/// Parse Event ObjectPath attributes from a soundbank XML to extract unit names.
+/// Looks for paths like `\Events\Animation\units\Archer\...` and extracts "Archer".
+/// Returns a sorted, deduplicated Vec of unit name strings.
+pub fn parse_event_unit_names(path: &Path) -> Result<Vec<String>, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read XML for event parsing: {}", e))?;
+
+    let mut reader = Reader::from_str(&content);
+    reader.config_mut().trim_text(true);
+
+    let mut unit_names = HashSet::new();
+    let mut buf = Vec::new();
+    let mut in_included_events = false;
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(XmlEvent::Start(e)) if e.name().as_ref() == b"IncludedEvents" => {
+                in_included_events = true;
+            }
+            Ok(XmlEvent::End(e)) if e.name().as_ref() == b"IncludedEvents" => {
+                in_included_events = false;
+            }
+            Ok(XmlEvent::Empty(e))
+                if in_included_events && e.name().as_ref() == b"Event" =>
+            {
+                for attr in e.attributes().flatten() {
+                    if attr.key.as_ref() == b"ObjectPath" {
+                        let obj_path = String::from_utf8_lossy(&attr.value).to_string();
+                        // Pattern: \Events\Animation\units\{UnitName}\...
+                        // Must match lowercase "units" exactly (capitalized \Units\ is shared combat events)
+                        let segments: Vec<&str> = obj_path.split('\\').collect();
+                        if let Some(units_idx) = segments.iter().position(|s| *s == "units") {
+                            if let Some(unit_name) = segments.get(units_idx + 1) {
+                                if !unit_name.is_empty() {
+                                    unit_names.insert(unit_name.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(XmlEvent::Eof) => break,
+            Err(e) => return Err(format!("XML parse error: {}", e)),
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    let mut sorted: Vec<String> = unit_names.into_iter().collect();
+    sorted.sort();
+    Ok(sorted)
 }
 
 /// Parse soundbank XML (Audio_Animation.xml, etc.) to get WEM file ID -> metadata mapping
@@ -162,56 +248,10 @@ fn parse_attr_u32(value: &[u8]) -> u32 {
     String::from_utf8_lossy(value).parse().unwrap_or(0)
 }
 
-/// Known unit types in Old World
-const KNOWN_UNITS: &[&str] = &[
-    "Archer",
-    "Axeman",
-    "Ballista",
-    "Battering",
-    "Bireme",
-    "Camel",
-    "Caravan",
-    "Cataphract",
-    "Chariot",
-    "Clubthrower",
-    "Crossbowman",
-    "Disciple",
-    "Dromon",
-    "Elephant",
-    "Gaesata",
-    "Hastatus",
-    "Hoplite",
-    "Horse",
-    "Horseman",
-    "Huscarl",
-    "Javelineer",
-    "Legionary",
-    "Longbowman",
-    "Maceman",
-    "Mangonel",
-    "Militia",
-    "Nomad",
-    "Onager",
-    "Peltast",
-    "Pikeman",
-    "Polybolos",
-    "Raider",
-    "Scout",
-    "Settler",
-    "Siege",
-    "Skirmisher",
-    "Slinger",
-    "Spearman",
-    "Swordsman",
-    "Trireme",
-    "Warlord",
-    "Warrior",
-    "Worker",
-];
-
-/// Parse short_name from soundbank XML to extract metadata
+/// Parse short_name from soundbank XML to extract metadata.
+/// `known_units` is derived dynamically from Event ObjectPaths at extraction time.
 /// Format: "cmbt.rng.slinger.short.00.MSTR.wav" or "mv.obj.arrowRattle.MSTR.09.wav"
-pub fn parse_short_name(short_name: &str) -> (String, Option<String>, String) {
+pub fn parse_short_name(short_name: &str, known_units: &[String]) -> (String, Option<String>, String) {
     // Remove file extension
     let name = short_name.trim_end_matches(".wav").trim_end_matches(".WAV");
 
@@ -242,7 +282,7 @@ pub fn parse_short_name(short_name: &str) -> (String, Option<String>, String) {
 
     // Look for unit type
     let mut unit_type: Option<String> = None;
-    for known in KNOWN_UNITS {
+    for known in known_units {
         if name_lower.contains(&known.to_lowercase()) {
             unit_type = Some(known.to_string());
             break;

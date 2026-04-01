@@ -3,13 +3,16 @@
 	import {
 		getExtractionStatus,
 		startExtraction,
+		updateLibrary,
 		cancelExtraction,
 		detectGamePath,
 		checkAudioDependencies
 	} from '$lib/api';
 	import type { ExtractionStatus } from '$lib/types';
 
-	let { onComplete }: { onComplete?: () => void } = $props();
+	let { onComplete, mode = 'extract' }: { onComplete?: () => void; mode?: 'extract' | 'update' } = $props();
+
+	let isUpdate = $derived(mode === 'update');
 
 	let status = $state<ExtractionStatus>({
 		state: 'not_started',
@@ -46,7 +49,11 @@
 		}
 
 		try {
-			await startExtraction(gamePath, includeMusic);
+			if (isUpdate) {
+				await updateLibrary(gamePath, includeMusic);
+			} else {
+				await startExtraction(gamePath, includeMusic);
+			}
 			startPolling();
 		} catch (e) {
 			console.error('Failed to start extraction:', e);
@@ -102,10 +109,11 @@
 		}
 
 		await detectPath();
-		status = await getExtractionStatus();
+		const currentStatus = await getExtractionStatus();
 
-		// Resume polling if extraction was in progress
-		if (status.state === 'in_progress') {
+		// Resume polling if extraction was in progress, otherwise show setup screen
+		if (currentStatus.state === 'in_progress') {
+			status = currentStatus;
 			startPolling();
 		}
 	});
@@ -118,9 +126,11 @@
 <div class="extraction-container">
 	{#if isNotStarted}
 		<div class="extraction-setup">
-			<h2>Extract Audio</h2>
+			<h2>{isUpdate ? 'Sync Library' : 'Extract Audio'}</h2>
 			<p class="description">
-				Extract sound effects from Old World's game files. This process takes 3-4 minutes.
+				{isUpdate
+					? 'Sync with game files to pick up new sounds or DLC. Existing sounds are skipped.'
+					: 'Extract sound effects from Old World\'s game files. This process takes 3-4 minutes.'}
 			</p>
 
 			{#if hasMissingDeps}
@@ -169,12 +179,12 @@
 			</div>
 
 			<button class="primary-button" onclick={handleStart} disabled={!gamePath || hasMissingDeps}>
-				Start Extraction
+				{isUpdate ? 'Sync Library' : 'Start Extraction'}
 			</button>
 		</div>
 	{:else if isInProgress}
 		<div class="extraction-progress">
-			<h2>Extracting Audio...</h2>
+			<h2>{isUpdate ? 'Syncing Library...' : 'Extracting Audio...'}</h2>
 
 			<div class="progress-bar-container">
 				<div class="progress-bar" style="width: {progressPercent}%"></div>
@@ -191,8 +201,8 @@
 		</div>
 	{:else if isComplete}
 		<div class="extraction-complete">
-			<h2>Extraction Complete</h2>
-			<p>Successfully extracted audio files.</p>
+			<h2>{isUpdate ? 'Sync Complete' : 'Extraction Complete'}</h2>
+			<p>{isUpdate ? 'Library is up to date.' : 'Successfully extracted audio files.'}</p>
 		</div>
 	{:else if hasError}
 		<div class="extraction-error">

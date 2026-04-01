@@ -138,7 +138,7 @@ pub async fn start_extraction(
     }
 
     // Check required files
-    let required_files = ["Events.xml", "Audio_Animation.bnk"];
+    let required_files = ["Events.xml"];
     for file in required_files {
         if !game_path.join(file).exists() {
             return Err(format!("Required file not found: {}", file));
@@ -164,6 +164,58 @@ pub async fn start_extraction(
     );
 
     // Spawn extraction task
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = extractor::run_extraction(
+            app,
+            game_path,
+            manager_clone.clone(),
+            catalog_for_task,
+            include_music,
+        )
+        .await
+        {
+            manager_clone.set_error(e);
+        }
+    });
+
+    Ok(())
+}
+
+/// Update the library by running extraction without clearing existing data.
+/// Skips already-converted files, only extracts new sounds.
+#[tauri::command]
+pub async fn update_library(
+    app: AppHandle,
+    game_path: String,
+    include_music: bool,
+    manager: State<'_, Arc<ExtractionManager>>,
+    _catalog: State<'_, Catalog>,
+) -> Result<(), String> {
+    let game_path = PathBuf::from(&game_path);
+    if !game_path.exists() {
+        return Err("Game path does not exist".into());
+    }
+
+    let required_files = ["Events.xml"];
+    for file in required_files {
+        if !game_path.join(file).exists() {
+            return Err(format!("Required file not found: {}", file));
+        }
+    }
+
+    let status = manager.get_status();
+    if matches!(status.state, ExtractionState::InProgress) {
+        return Err("Extraction already in progress".into());
+    }
+
+    manager.reset();
+
+    let manager_clone = Arc::clone(&*manager);
+    let db_path = crate::catalog::get_db_path()?;
+    let catalog_for_task = Arc::new(
+        Catalog::open(db_path).map_err(|e| format!("Failed to open catalog: {}", e))?
+    );
+
     tauri::async_runtime::spawn(async move {
         if let Err(e) = extractor::run_extraction(
             app,

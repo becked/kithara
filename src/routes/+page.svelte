@@ -9,6 +9,8 @@
 	import { soundsState, filterState, initializeSounds, fetchSounds } from '$lib/stores/sounds.svelte';
 	import { getExtractionStatus, clearCache, setWindowForMusicPlayer } from '$lib/api';
 
+	let extractionMode = $state<'extract' | 'update'>('extract');
+
 	async function goToMusicPlayer() {
 		await setWindowForMusicPlayer();
 		goto('/music');
@@ -37,9 +39,15 @@
 		initialized = true;
 	}
 
+	async function handleUpdateLibrary() {
+		extractionMode = 'update';
+		needsExtraction = true;
+	}
+
 	async function handleRebuildCache() {
 		try {
 			await clearCache();
+			extractionMode = 'extract';
 			needsExtraction = true;
 		} catch (e) {
 			console.error('Failed to clear cache:', e);
@@ -88,7 +96,7 @@
 	</div>
 {:else if needsExtraction}
 	<div class="extraction-screen">
-		<ExtractionProgress onComplete={handleExtractionComplete} />
+		<ExtractionProgress onComplete={handleExtractionComplete} mode={extractionMode} />
 	</div>
 {:else}
 	<div class="app-layout">
@@ -117,7 +125,14 @@
 							</svg>
 							<span>Music</span>
 						</button>
-						<button class="rebuild-button" onclick={handleRebuildCache} title="Rebuild Cache">
+						<button class="update-button" onclick={handleUpdateLibrary} title="Sync library with game files for new sounds or DLC">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+							<path d="m9 13 2 2 4-4"/>
+						</svg>
+						Sync
+					</button>
+						<button class="rebuild-button" onclick={handleRebuildCache} title="Wipe and re-extract all sounds from scratch">
 						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 							<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
 							<path d="M3 3v5h5"/>
@@ -247,6 +262,31 @@
 		color: var(--color-primary);
 		border-color: var(--color-primary);
 		background: rgba(233, 69, 96, 0.1);
+	}
+
+	.update-button {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.4rem 0.75rem;
+		background: transparent;
+		color: var(--color-text-muted);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		font-size: 0.85rem;
+		cursor: pointer;
+		font-family: inherit;
+		transition: all 0.2s;
+	}
+
+	.update-button:hover {
+		color: var(--color-primary);
+		border-color: var(--color-primary);
+		background: rgba(233, 69, 96, 0.1);
+	}
+
+	.update-button svg {
+		flex-shrink: 0;
 	}
 
 	.rebuild-button {

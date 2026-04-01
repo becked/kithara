@@ -88,20 +88,33 @@ pub async fn run_extraction(
         Some("Parsing metadata...".into()),
     );
 
-    // Step 1: Parse soundbank XML files to get WEM file ID -> metadata mapping
-    let xml_files = vec![
-        ("Audio_Animation.xml", "Audio_Animation.bnk"),
-        ("Audio_2D.xml", "Audio_2D.bnk"),
-        ("Audio_3D.xml", "Audio_3D.bnk"),
-    ];
+    // Step 1: Discover soundbanks and parse XML metadata
+    let soundbank_pairs = metadata::discover_soundbanks(&game_path)?;
+    if soundbank_pairs.is_empty() {
+        return Err("No soundbanks with embedded audio found in game directory".into());
+    }
+    println!(
+        "Discovered {} soundbanks: {:?}",
+        soundbank_pairs.len(),
+        soundbank_pairs.iter().map(|(_, b)| b.as_str()).collect::<Vec<_>>()
+    );
 
     let mut file_metadata = std::collections::HashMap::new();
-    for (xml_name, _) in &xml_files {
+    let mut music_file_ids: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    for (xml_name, _) in &soundbank_pairs {
         let xml_path = game_path.join(xml_name);
         if xml_path.exists() {
+            // Check if this is a music bank (contains ReferencedStreamedFiles)
+            let content = std::fs::read_to_string(&xml_path).unwrap_or_default();
+            let is_music_bank = content.contains("ReferencedStreamedFiles");
+
             match metadata::parse_soundbank_xml(&xml_path) {
                 Ok(files) => {
-                    println!("Parsed {} file entries from {}", files.len(), xml_name);
+                    println!("Parsed {} file entries from {}{}", files.len(), xml_name,
+                        if is_music_bank { " (music bank)" } else { "" });
+                    if is_music_bank {
+                        music_file_ids.extend(files.keys());
+                    }
                     file_metadata.extend(files);
                 }
                 Err(e) => {
@@ -112,6 +125,30 @@ pub async fn run_extraction(
     }
     println!("Total file metadata entries: {}", file_metadata.len());
 
+    // Build dynamic unit list from Event ObjectPaths
+    let animation_xml = game_path.join("Audio_Animation.xml");
+    let known_units = if animation_xml.exists() {
+        match metadata::parse_event_unit_names(&animation_xml) {
+            Ok(units) => {
+                println!("Discovered {} unit types from Events", units.len());
+                units
+            }
+            Err(e) => {
+                println!("Warning: Failed to parse unit names: {}. Unit categorization will be limited.", e);
+                Vec::new()
+            }
+        }
+    } else {
+        println!("Warning: Audio_Animation.xml not found. Unit categorization will be limited.");
+        Vec::new()
+    };
+
+    // Progress allocation depends on whether music is included
+    let bnk_start = 0.10;
+    let bnk_end = if include_music { 0.50 } else { 0.95 };
+    let music_start = 0.50;
+    let music_end = 1.0;
+
     manager.update_status(
         ExtractionState::InProgress,
         0.05,
@@ -119,7 +156,7 @@ pub async fn run_extraction(
     );
 
     // Step 2: Parse BNK files and extract WEM data
-    let bnk_files = vec!["Audio_Animation.bnk", "Audio_2D.bnk", "Audio_3D.bnk"];
+    let bnk_files: Vec<&str> = soundbank_pairs.iter().map(|(_, b)| b.as_str()).collect();
 
     let mut all_wem_entries = Vec::new();
     for bnk_name in &bnk_files {
@@ -189,23 +226,15 @@ pub async fn run_extraction(
             continue;
         }
 
-        // Check if this is a music file
-        let is_music = is_music_file(&file_info.short_name);
-
-        // Extract WEM bytes to temp file
-        let wem_path = temp_dir.join(format!("{}.wem", entry.file_id));
-        if let Err(e) = bnk_parser::extract_wem_bytes(&entry, &wem_path) {
-            eprintln!("Failed to extract WEM {}: {}", entry.file_id, e);
-            processed += 1;
-            continue;
-        }
+        // Check if this is a music file (by name convention or source bank)
+        let is_music = is_music_file(&file_info.short_name) || music_file_ids.contains(&entry.file_id);
 
         // Build output path based on file metadata
         let output_subdir = if is_music {
             // Music goes to sounds/music/
             sounds_dir.join("music")
         } else {
-            let (category, unit_type, _) = metadata::parse_short_name(&file_info.short_name);
+            let (category, unit_type, _) = metadata::parse_short_name(&file_info.short_name, &known_units);
             if let Some(ref unit) = unit_type {
                 sounds_dir.join(&category).join(unit.to_lowercase())
             } else {
@@ -218,6 +247,26 @@ pub async fn run_extraction(
         // Generate clean filename from file ID and short name
         let filename = format!("{}_{}", entry.file_id, sanitize_filename(&file_info.short_name));
         let output_path = output_subdir.join(format!("{}.ogg", filename));
+
+        // Skip if already converted
+        if output_path.exists() {
+            processed += 1;
+            let progress = bnk_start + (processed as f32 / total as f32) * (bnk_end - bnk_start);
+            manager.update_status(
+                ExtractionState::InProgress,
+                progress,
+                Some(file_info.short_name.clone()),
+            );
+            continue;
+        }
+
+        // Extract WEM bytes to temp file
+        let wem_path = temp_dir.join(format!("{}.wem", entry.file_id));
+        if let Err(e) = bnk_parser::extract_wem_bytes(&entry, &wem_path) {
+            eprintln!("Failed to extract WEM {}: {}", entry.file_id, e);
+            processed += 1;
+            continue;
+        }
 
         // Convert WEM -> WAV -> OGG
         match converter::convert_wem_to_ogg(&app, &wem_path, &output_path).await {
@@ -243,7 +292,7 @@ pub async fn run_extraction(
                     }
                 } else {
                     // Insert into sounds table
-                    let (category, unit_type, subcategory) = metadata::parse_short_name(&file_info.short_name);
+                    let (category, unit_type, subcategory) = metadata::parse_short_name(&file_info.short_name, &known_units);
                     let sound = Sound {
                         id: format!("{}", entry.file_id),
                         event_name: file_info.short_name.clone(),
@@ -273,7 +322,7 @@ pub async fn run_extraction(
         let _ = std::fs::remove_file(&wem_path);
 
         processed += 1;
-        let progress = 0.10 + (processed as f32 / total as f32) * 0.85;
+        let progress = bnk_start + (processed as f32 / total as f32) * (bnk_end - bnk_start);
         manager.update_status(
             ExtractionState::InProgress,
             progress,
@@ -297,7 +346,7 @@ pub async fn run_extraction(
     if include_music {
         manager.update_status(
             ExtractionState::InProgress,
-            0.96,
+            music_start,
             Some("Extracting music tracks...".into()),
         );
 
@@ -307,6 +356,8 @@ pub async fn run_extraction(
             &sounds_dir,
             &catalog,
             &manager,
+            music_start,
+            music_end,
         ).await;
 
         if let Err(e) = music_result {
@@ -348,8 +399,8 @@ fn build_tags(event_name: &str, category: &str, unit_type: Option<&str>) -> Vec<
     tags
 }
 
-/// Exclusion patterns for unreleased content (case-insensitive substrings)
-const EXCLUSION_PATTERNS: &[&str] = &["jungle", "huns", "yuezhi", "india", "migration", "monkey"];
+/// Exclusion patterns for content filtering (case-insensitive substrings)
+const EXCLUSION_PATTERNS: &[&str] = &[];
 
 /// Check if a file name indicates a music track
 fn is_music_file(name: &str) -> bool {
@@ -382,6 +433,8 @@ async fn extract_streamed_music(
     sounds_dir: &PathBuf,
     catalog: &Arc<Catalog>,
     manager: &Arc<ExtractionManager>,
+    progress_start: f32,
+    progress_end: f32,
 ) -> Result<(), String> {
     // Parse SoundbanksInfo.xml to get streamed file mappings
     let soundbanks_info_path = game_path.join("SoundbanksInfo.xml");
@@ -426,6 +479,12 @@ async fn extract_streamed_music(
         if output_path.exists() {
             processed += 1;
             successful += 1;
+            let progress = progress_start + (processed as f32 / total as f32) * (progress_end - progress_start);
+            manager.update_status(
+                ExtractionState::InProgress,
+                progress,
+                Some(format!("Music: {} (cached)", title)),
+            );
             continue;
         }
 
@@ -457,7 +516,7 @@ async fn extract_streamed_music(
         }
 
         processed += 1;
-        let progress = 0.96 + (processed as f32 / total as f32) * 0.04;
+        let progress = progress_start + (processed as f32 / total as f32) * (progress_end - progress_start);
         manager.update_status(
             ExtractionState::InProgress,
             progress,

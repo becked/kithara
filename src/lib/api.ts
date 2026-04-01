@@ -70,6 +70,10 @@ export async function startExtraction(gamePath: string, includeMusic: boolean = 
 	return invoke('start_extraction', { gamePath, includeMusic });
 }
 
+export async function updateLibrary(gamePath: string, includeMusic: boolean = false): Promise<void> {
+	return invoke('update_library', { gamePath, includeMusic });
+}
+
 export async function cancelExtraction(): Promise<void> {
 	return invoke('cancel_extraction');
 }

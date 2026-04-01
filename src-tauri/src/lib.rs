@@ -43,6 +43,7 @@ pub fn run() {
             commands::get_playback_status,
             commands::get_extraction_status,
             commands::start_extraction,
+            commands::update_library,
             commands::cancel_extraction,
             commands::check_audio_dependencies,
             commands::clear_cache,
